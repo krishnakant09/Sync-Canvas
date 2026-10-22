@@ -80,7 +80,7 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
       try {
         const json = JSON.parse(event.target?.result as string);
         onImportJSON(json);
-      } catch (err) {
+      } catch {
         alert('Failed to parse board JSON file.');
       }
     };

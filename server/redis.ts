@@ -111,7 +111,7 @@ export function publishRoomUpdate(roomName: string, update: Uint8Array) {
     });
 
     pubClient.publish(`synccanvas:room:${roomName}`, payload).catch(() => {});
-  } catch (err) {
+  } catch {
     // Non-blocking
   }
 }

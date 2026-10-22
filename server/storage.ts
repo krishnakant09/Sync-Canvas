@@ -84,7 +84,7 @@ export async function listSnapshots(): Promise<SnapshotMeta[]> {
       }
     }
     return results;
-  } catch (err) {
+  } catch {
     return [];
   }
 }

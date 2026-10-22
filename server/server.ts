@@ -141,11 +141,86 @@ initRedis((roomName, update) => {
   }
 });
 
+/**
+ * Set essential HTTP security headers recommended for production web applications.
+ * Addresses:
+ * - Content-Security-Policy (CSP) to block unauthorized scripts, clickjacking, and injection.
+ * - X-Frame-Options to DENY clickjacking.
+ * - X-Content-Type-Options to prevent MIME-type sniffing.
+ * - Strict-Transport-Security (HSTS) to enforce HTTPS connections.
+ * - Referrer-Policy and X-XSS-Protection for defense-in-depth.
+ */
+function applySecurityHeaders(res: http.ServerResponse): void {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "img-src 'self' data: blob: https:",
+      "connect-src 'self' ws: wss: http: https:",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ')
+  );
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-XSS-Protection', '0');
+}
+
+/**
+ * Configure restricted CORS headers to prevent cross-origin data leakage.
+ * Addresses [MEDIUM] Any website can read your responses (open CORS).
+ * Instead of wildcards (*), only authorized application domains and trusted local origins are permitted.
+ */
+function applyCorsHeaders(req: http.IncomingMessage, res: http.ServerResponse): void {
+  const origin = req.headers.origin;
+
+  const allowedOrigins = new Set<string>([
+    'https://sync-canvas.antideploy.app',
+    'http://localhost:5173',
+    'http://localhost:1234',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:1234',
+  ]);
+
+  if (process.env.APP_URL) {
+    try { allowedOrigins.add(new URL(process.env.APP_URL).origin); } catch {}
+  }
+  if (process.env.SITE_URL) {
+    try { allowedOrigins.add(new URL(process.env.SITE_URL).origin); } catch {}
+  }
+  if (process.env.CORS_ORIGIN) {
+    process.env.CORS_ORIGIN.split(',').forEach((o) => {
+      const trimmed = o.trim();
+      if (trimmed) allowedOrigins.add(trimmed);
+    });
+  }
+
+  const isAllowed =
+    origin &&
+    (allowedOrigins.has(origin) ||
+      /^https:\/\/sync-canvas[a-z0-9-]*\.antideploy\.app$/.test(origin));
+
+  if (isAllowed && origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Vary', 'Origin');
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+}
+
 // HTTP Request Handler (REST API, Telemetry, and Production Static Assets)
 const server = http.createServer(async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // Apply hardened HTTP security and restricted CORS headers
+  applySecurityHeaders(res);
+  applyCorsHeaders(req, res);
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -257,7 +332,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
       res.end(data);
       return;
-    } catch (e) {
+    } catch {
       // Fall through to 404
     }
   }

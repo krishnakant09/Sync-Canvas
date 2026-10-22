@@ -10,14 +10,11 @@ interface UserProfileModalProps {
   onSaveProfile: (profile: UserProfile) => void;
 }
 
-export const UserProfileModal: React.FC<UserProfileModalProps> = ({
-  isOpen,
-  onClose,
-  currentProfile,
-  onSaveProfile,
-}) => {
-  if (!isOpen) return null;
-
+const UserProfileDialog: React.FC<{
+  currentProfile: UserProfile;
+  onClose: () => void;
+  onSaveProfile: (profile: UserProfile) => void;
+}> = ({ currentProfile, onClose, onSaveProfile }) => {
   const [name, setName] = useState(currentProfile.name);
   const [color, setColor] = useState(currentProfile.color);
 
@@ -171,5 +168,21 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         </form>
       </div>
     </div>
+  );
+};
+
+export const UserProfileModal: React.FC<UserProfileModalProps> = ({
+  isOpen,
+  onClose,
+  currentProfile,
+  onSaveProfile,
+}) => {
+  if (!isOpen) return null;
+  return (
+    <UserProfileDialog
+      currentProfile={currentProfile}
+      onClose={onClose}
+      onSaveProfile={onSaveProfile}
+    />
   );
 };

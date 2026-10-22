@@ -35,14 +35,14 @@ export function getStoredUserProfile(): UserProfile {
     if (raw) {
       return JSON.parse(raw);
     }
-  } catch (e) {
+  } catch {
     // ignore
   }
 
   const generated = getRandomProfile();
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(generated));
-  } catch (e) {
+  } catch {
     // ignore
   }
   return generated;
@@ -51,7 +51,7 @@ export function getStoredUserProfile(): UserProfile {
 export function saveUserProfile(profile: UserProfile): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-  } catch (e) {
+  } catch {
     // ignore
   }
 }
