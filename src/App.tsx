@@ -19,6 +19,7 @@ import {
 } from './utils/math';
 import { exportToJSON, exportToPNG } from './utils/export';
 import { getStoredUserProfile } from './utils/user';
+import { Sliders } from 'lucide-react';
 import { useYjsRoom } from './hooks/useYjsRoom';
 import { CanvasGrid } from './components/CanvasGrid';
 import { Toolbar } from './components/Toolbar';
@@ -188,7 +189,8 @@ export const App: React.FC = () => {
 
   // Tools & Selection
   const [activeTool, setActiveTool] = useState<ToolType>('select');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(['demo_sticky_1']));
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isPropertiesDrawerOpen, setIsPropertiesDrawerOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
@@ -872,6 +874,7 @@ export const App: React.FC = () => {
           setIsShortcutsOpen((prev) => !prev);
           break;
         case 'escape':
+          setIsPropertiesDrawerOpen(false);
           setSelectedIds(new Set());
           setEditingId(null);
           break;
@@ -928,10 +931,62 @@ export const App: React.FC = () => {
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         totalElements={renderedElements.length}
         isMobile={isMobile}
+        isPropertiesOpen={isPropertiesDrawerOpen}
+        onToggleProperties={() => setIsPropertiesDrawerOpen((prev) => !prev)}
+        hasSelection={selectedElements.length > 0}
       />
 
-      {/* Selected Element Properties Inspector */}
+      {/* Dedicated Floating Style & Properties Drawer Button (when closed) */}
+      {!isPropertiesDrawerOpen && (
+        <button
+          onClick={() => setIsPropertiesDrawerOpen(true)}
+          className="glass-panel animate-fade-in"
+          aria-label="Open Style & Properties Drawer"
+          data-tooltip="Open Style & Properties Drawer"
+          style={{
+            position: 'absolute',
+            top: isMobile ? '56px' : '68px',
+            left: isMobile ? '12px' : '20px',
+            padding: isMobile ? '6px 12px' : '7px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: isMobile ? '12px' : '13px',
+            fontWeight: 600,
+            color: selectedElements.length > 0 ? 'var(--text-main)' : 'var(--text-muted)',
+            zIndex: 40,
+            borderRadius: '24px',
+            cursor: 'pointer',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)',
+            background: 'rgba(18, 22, 34, 0.88)',
+            backdropFilter: 'blur(16px)',
+            border: selectedElements.length > 0 ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
+          <Sliders size={isMobile ? 14 : 16} color={selectedElements.length > 0 ? 'var(--primary)' : 'currentColor'} />
+          <span>Style</span>
+          {selectedElements.length > 0 && (
+            <span
+              style={{
+                background: 'var(--primary)',
+                color: '#ffffff',
+                borderRadius: '10px',
+                padding: '1px 6px',
+                fontSize: '11px',
+                fontWeight: 700,
+              }}
+            >
+              {selectedElements.length}
+            </span>
+          )}
+        </button>
+      )}
+
+      {/* Selected Element Properties Inspector (controlled drawer) */}
       <PropertiesPanel
+        isOpen={isPropertiesDrawerOpen}
+        onClose={() => setIsPropertiesDrawerOpen(false)}
         selectedElements={selectedElements}
         onUpdateElement={handleUpdateElement}
         onDeleteElements={handleDeleteSelected}
@@ -983,6 +1038,9 @@ export const App: React.FC = () => {
         canRedo={canRedo}
         onUndo={undo}
         onRedo={redo}
+        isPropertiesOpen={isPropertiesDrawerOpen}
+        onToggleProperties={() => setIsPropertiesDrawerOpen((prev) => !prev)}
+        hasSelection={selectedElements.length > 0}
       />
 
       {/* Bottom Status Bar */}

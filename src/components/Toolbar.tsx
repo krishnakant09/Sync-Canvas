@@ -11,6 +11,7 @@ import {
   Eraser,
   Undo2,
   Redo2,
+  Sliders,
 } from 'lucide-react';
 import type { ToolType } from '../types/canvas';
 
@@ -21,6 +22,9 @@ interface ToolbarProps {
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  isPropertiesOpen?: boolean;
+  onToggleProperties?: () => void;
+  hasSelection?: boolean;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -30,6 +34,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   canRedo,
   onUndo,
   onRedo,
+  isPropertiesOpen = false,
+  onToggleProperties,
+  hasSelection = false,
 }) => {
   const tools: Array<{ id: ToolType; label: string; icon: React.ReactNode; shortcut: string }> = [
     { id: 'select', label: 'Select (V)', icon: <MousePointer size={18} />, shortcut: 'V' },
@@ -106,6 +113,43 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       >
         <Redo2 size={18} />
       </button>
+
+      {onToggleProperties && (
+        <>
+          <div
+            style={{
+              width: '1px',
+              height: '24px',
+              background: 'var(--border-subtle)',
+              margin: '0 4px',
+              flexShrink: 0,
+            }}
+          />
+          <button
+            className={`icon-btn ${isPropertiesOpen ? 'active' : ''}`}
+            onClick={onToggleProperties}
+            data-tooltip="Style & Properties Drawer"
+            aria-label="Style & Properties Drawer"
+            style={{ position: 'relative', flexShrink: 0 }}
+          >
+            <Sliders size={18} />
+            {hasSelection && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '5px',
+                  right: '5px',
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--primary)',
+                  boxShadow: '0 0 6px var(--primary-glow)',
+                }}
+              />
+            )}
+          </button>
+        </>
+      )}
     </div>
   );
 };

@@ -16,6 +16,7 @@ import {
   Menu,
   X,
   User,
+  Sliders,
 } from 'lucide-react';
 import type { UserPresence, UserProfile, Viewport } from '../types/canvas';
 import type { ConnectionStatus } from '../hooks/useYjsRoom';
@@ -40,6 +41,9 @@ interface CanvasHeaderProps {
   onOpenShortcuts: () => void;
   totalElements: number;
   isMobile?: boolean;
+  isPropertiesOpen?: boolean;
+  onToggleProperties?: () => void;
+  hasSelection?: boolean;
 }
 
 export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
@@ -62,6 +66,9 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
   onOpenShortcuts,
   totalElements,
   isMobile = false,
+  isPropertiesOpen = false,
+  onToggleProperties,
+  hasSelection = false,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
@@ -433,6 +440,30 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Style & Properties Drawer Toggle */}
+              {onToggleProperties && (
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onToggleProperties();
+                  }}
+                  className="glass-panel"
+                  style={{
+                    height: '40px',
+                    gap: '8px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    width: '100%',
+                    justifyContent: 'center',
+                    border: isPropertiesOpen ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+                    color: isPropertiesOpen ? 'var(--primary)' : 'var(--text-main)',
+                  }}
+                >
+                  <Sliders size={16} color={isPropertiesOpen ? 'var(--primary)' : 'currentColor'} />
+                  {isPropertiesOpen ? 'Close Style Drawer' : `Open Style & Properties ${hasSelection ? `(Selection Active)` : ''}`}
+                </button>
+              )}
 
               {/* Actions */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
@@ -858,6 +889,31 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
         </button>
 
         <div style={{ width: '1px', height: '20px', background: 'var(--border-subtle)', margin: '0 2px' }} />
+
+        {onToggleProperties && (
+          <button
+            className={`icon-btn ${isPropertiesOpen ? 'active' : ''}`}
+            onClick={onToggleProperties}
+            data-tooltip="Style & Properties Drawer"
+            data-tooltip-pos="bottom"
+            style={{ position: 'relative' }}
+          >
+            <Sliders size={16} />
+            {hasSelection && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--primary)',
+                }}
+              />
+            )}
+          </button>
+        )}
 
         <button
           className="icon-btn"
