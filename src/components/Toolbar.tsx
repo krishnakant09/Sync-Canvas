@@ -46,22 +46,30 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   return (
     <div
       className="glass-panel"
+      role="toolbar"
+      aria-label="Canvas Drawing and Selection Tools"
       style={{
         position: 'absolute',
-        bottom: '24px',
+        bottom: 'max(14px, env(safe-area-inset-bottom, 14px))',
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
-        padding: '6px 10px',
+        gap: '4px',
+        padding: '6px 8px',
         zIndex: 50,
+        maxWidth: 'calc(100vw - 16px)',
+        overflowX: 'auto',
+        scrollbarWidth: 'none',
+        WebkitOverflowScrolling: 'touch',
+        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6), 0 0 1px 1px rgba(255, 255, 255, 0.08)',
       }}
     >
       {tools.map((t) => (
         <button
           key={t.id}
           className={`icon-btn ${activeTool === t.id ? 'active' : ''}`}
+          style={{ flexShrink: 0 }}
           onClick={() => setActiveTool(t.id)}
           data-tooltip={t.label}
           aria-label={t.label}

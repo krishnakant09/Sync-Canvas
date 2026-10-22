@@ -200,6 +200,32 @@ export const App: React.FC = () => {
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [previewElement, setPreviewElement] = useState<CanvasElement | null>(null);
 
+  // Mobile device detection
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Multi-touch pinch-to-zoom and pan state
+  const pinchStateRef = useRef<{
+    initialDist: number;
+    initialZoom: number;
+    initialViewport: Viewport;
+    initialCenter: Point;
+  } | null>(null);
+
+  // Mobile double tap detection
+  const lastTapRef = useRef<{ time: number; x: number; y: number }>({
+    time: 0,
+    x: 0,
+    y: 0,
+  });
+
   // Broadcast selected elements to awareness whenever selection changes
   useEffect(() => {
     updateSelectedElementIds(Array.from(selectedIds));
@@ -349,28 +375,34 @@ export const App: React.FC = () => {
   };
 
   // ==========================================
-  // MOUSE & POINTER EVENTS ON CANVAS
+  // UNIFIED POINTER & TOUCH GESTURE HANDLERS
   // ==========================================
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.button === 1 || isSpacePressed || activeTool === 'hand') {
+  const handlePointerDown = (
+    clientX: number,
+    clientY: number,
+    target: EventTarget | null,
+    isShift = false,
+    button = 0
+  ) => {
+    if (button === 1 || isSpacePressed || activeTool === 'hand') {
       setDragState({
         type: 'pan',
-        startX: e.clientX,
-        startY: e.clientY,
-        currentX: e.clientX,
-        currentY: e.clientY,
+        startX: clientX,
+        startY: clientY,
+        currentX: clientX,
+        currentY: clientY,
         initialViewport: { ...viewport },
       });
       return;
     }
 
-    if (e.button !== 0) return;
+    if (button !== 0) return;
 
-    const worldPoint = screenToWorld(e.clientX, e.clientY, viewport);
-    const target = e.target as SVGElement;
-    const handleAttr = target.getAttribute('data-handle') as ResizeHandle | null;
+    const worldPoint = screenToWorld(clientX, clientY, viewport);
+    const svgElem = target as SVGElement | null;
+    const handleAttr = svgElem?.getAttribute ? (svgElem.getAttribute('data-handle') as ResizeHandle | null) : null;
 
-    // 1. Click on Resize Handle
+    // 1. Click / Tap on Resize Handle
     if (handleAttr && selectedElements.length > 0) {
       const initialMap = new Map<string, CanvasElement>();
       selectedElements.forEach((el) => initialMap.set(el.id, { ...el }));
@@ -387,7 +419,7 @@ export const App: React.FC = () => {
       return;
     }
 
-    // 2. Eraser Tool: Click to delete element
+    // 2. Eraser Tool: Click / Tap to delete element
     if (activeTool === 'eraser') {
       const hit = [...renderedElements].reverse().find((el) => isPointInElement(worldPoint, el));
       if (hit) {
@@ -407,7 +439,7 @@ export const App: React.FC = () => {
 
       if (hit) {
         const nextSelected = new Set(selectedIds);
-        if (e.shiftKey) {
+        if (isShift) {
           if (nextSelected.has(hit.id)) nextSelected.delete(hit.id);
           else nextSelected.add(hit.id);
         } else {
@@ -433,7 +465,7 @@ export const App: React.FC = () => {
           initialElements: initialMap,
         });
       } else {
-        if (!e.shiftKey) setSelectedIds(new Set());
+        if (!isShift) setSelectedIds(new Set());
         setDragState({
           type: 'box-select',
           startX: worldPoint.x,
@@ -528,18 +560,16 @@ export const App: React.FC = () => {
     });
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const worldPoint = screenToWorld(e.clientX, e.clientY, viewport);
+  const handlePointerMove = (clientX: number, clientY: number) => {
+    const worldPoint = screenToWorld(clientX, clientY, viewport);
     setCursorPos(worldPoint);
-
-    // Broadcast cursor position to remote collaborators via Awareness
     updateCursor(worldPoint);
 
     if (!dragState) return;
 
     if (dragState.type === 'pan' && dragState.initialViewport) {
-      const dx = e.clientX - dragState.startX;
-      const dy = e.clientY - dragState.startY;
+      const dx = clientX - dragState.startX;
+      const dy = clientY - dragState.startY;
       setViewport({
         ...dragState.initialViewport,
         x: dragState.initialViewport.x + dx,
@@ -621,12 +651,7 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleMouseLeave = () => {
-    // Clear cursor from remote peer view when mouse leaves canvas window
-    updateCursor(null);
-  };
-
-  const handleMouseUp = () => {
+  const handlePointerUp = () => {
     if (!dragState) return;
 
     if (dragState.type === 'move' || dragState.type === 'resize') {
@@ -668,6 +693,111 @@ export const App: React.FC = () => {
     }
 
     setDragState(null);
+  };
+
+  // Mouse Handlers
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    handlePointerDown(e.clientX, e.clientY, e.target, e.shiftKey, e.button);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    handlePointerMove(e.clientX, e.clientY);
+  };
+
+  const handleMouseLeave = () => {
+    updateCursor(null);
+  };
+
+  const handleMouseUp = () => {
+    handlePointerUp();
+  };
+
+  // Mobile Touch Handlers (with multi-touch pinch-to-zoom & two-finger pan)
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2) {
+      // 2-finger multi-touch gesture: pinch-to-zoom & two-finger pan
+      const t0 = e.touches[0];
+      const t1 = e.touches[1];
+      const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      const center = {
+        x: (t0.clientX + t1.clientX) / 2,
+        y: (t0.clientY + t1.clientY) / 2,
+      };
+      pinchStateRef.current = {
+        initialDist: dist,
+        initialZoom: viewport.zoom,
+        initialViewport: { ...viewport },
+        initialCenter: center,
+      };
+      setDragState(null);
+      setPreviewElement(null);
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      pinchStateRef.current = null;
+      const t = e.touches[0];
+      const now = Date.now();
+      const dist = Math.hypot(t.clientX - lastTapRef.current.x, t.clientY - lastTapRef.current.y);
+      const isDoubleTap = now - lastTapRef.current.time < 350 && dist < 35;
+      lastTapRef.current = { time: now, x: t.clientX, y: t.clientY };
+
+      if (isDoubleTap) {
+        const worldPoint = screenToWorld(t.clientX, t.clientY, viewport);
+        const hit = [...renderedElements].reverse().find((el) => isPointInElement(worldPoint, el));
+        if (hit && (hit.type === 'text' || hit.type === 'sticky')) {
+          setEditingId(hit.id);
+          return;
+        }
+      }
+
+      handlePointerDown(t.clientX, t.clientY, e.target, false, 0);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2 && pinchStateRef.current) {
+      const t0 = e.touches[0];
+      const t1 = e.touches[1];
+      const currentDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      const currentCenter = {
+        x: (t0.clientX + t1.clientX) / 2,
+        y: (t0.clientY + t1.clientY) / 2,
+      };
+
+      const scale = currentDist / pinchStateRef.current.initialDist;
+      const newZoom = Math.min(3.0, Math.max(0.15, pinchStateRef.current.initialZoom * scale));
+
+      // Calculate focal world point
+      const focalWorldX =
+        (pinchStateRef.current.initialCenter.x - pinchStateRef.current.initialViewport.x) /
+        pinchStateRef.current.initialZoom;
+      const focalWorldY =
+        (pinchStateRef.current.initialCenter.y - pinchStateRef.current.initialViewport.y) /
+        pinchStateRef.current.initialZoom;
+
+      setViewport({
+        zoom: newZoom,
+        x: currentCenter.x - focalWorldX * newZoom,
+        y: currentCenter.y - focalWorldY * newZoom,
+      });
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      handlePointerMove(t.clientX, t.clientY);
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 0) {
+      pinchStateRef.current = null;
+      handlePointerUp();
+      updateCursor(null);
+    } else if (e.touches.length === 1) {
+      pinchStateRef.current = null;
+    }
   };
 
   // ==========================================
@@ -797,6 +927,7 @@ export const App: React.FC = () => {
         }}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         totalElements={renderedElements.length}
+        isMobile={isMobile}
       />
 
       {/* Selected Element Properties Inspector */}
@@ -807,15 +938,26 @@ export const App: React.FC = () => {
         onDuplicateElements={handleDuplicateSelected}
         onBringToFront={handleBringToFront}
         onSendToBack={handleSendToBack}
+        isMobile={isMobile}
       />
 
-      {/* Main SVG Interactive Canvas */}
+      {/* Main SVG Interactive Canvas with Unified Pointer & Touch Handlers */}
       <div
-        style={{ width: '100%', height: '100%' }}
+        style={{
+          width: '100%',
+          height: '100%',
+          touchAction: 'none',
+          userSelect: 'none',
+          WebkitTouchCallout: 'none',
+        }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onMouseUp={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
       >
         <CanvasRenderer
           svgRef={svgRef}
@@ -848,26 +990,31 @@ export const App: React.FC = () => {
         className="glass-panel"
         style={{
           position: 'absolute',
-          bottom: '16px',
-          right: '24px',
-          padding: '4px 12px',
+          bottom: isMobile ? '70px' : '16px',
+          right: isMobile ? '12px' : '24px',
+          padding: isMobile ? '3px 8px' : '4px 12px',
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
+          gap: isMobile ? '6px' : '12px',
           fontSize: '11px',
           fontFamily: 'var(--font-mono)',
           color: 'var(--text-dim)',
-          zIndex: 40,
+          zIndex: 35,
+          pointerEvents: 'none',
         }}
       >
-        <span>
-          X: {Math.round(cursorPos.x)}, Y: {Math.round(cursorPos.y)}
-        </span>
-        <span style={{ color: 'var(--border-subtle)' }}>|</span>
-        <span>Zoom: {Math.round(viewport.zoom * 100)}%</span>
-        <span style={{ color: 'var(--border-subtle)' }}>|</span>
+        {!isMobile && (
+          <>
+            <span>
+              X: {Math.round(cursorPos.x)}, Y: {Math.round(cursorPos.y)}
+            </span>
+            <span style={{ color: 'var(--border-subtle)' }}>|</span>
+            <span>Zoom: {Math.round(viewport.zoom * 100)}%</span>
+            <span style={{ color: 'var(--border-subtle)' }}>|</span>
+          </>
+        )}
         <span style={{ color: connectionStatus === 'connected' ? 'var(--accent-emerald)' : 'var(--accent-amber)' }}>
-          ● {connectionStatus.toUpperCase()} ({remoteUsers.length} peers)
+          ● {isMobile ? connectionStatus.toUpperCase() : `${connectionStatus.toUpperCase()} (${remoteUsers.length} peers)`}
         </span>
       </div>
 

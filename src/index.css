@@ -32,12 +32,17 @@
   margin: 0;
   padding: 0;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html, body, #root {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
   background-color: var(--bg-canvas);
   color: var(--text-main);
   font-family: var(--font-sans);
@@ -191,12 +196,30 @@ input:focus, textarea:focus, select:focus {
   position: relative;
   overflow: hidden;
   background-color: var(--bg-canvas);
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 .canvas-svg {
   width: 100%;
   height: 100%;
   display: block;
+  touch-action: none;
+}
+
+/* Disable hover tooltips on touch devices to avoid stuck tooltips */
+@media (hover: none) and (pointer: coarse) {
+  [data-tooltip]::after {
+    display: none !important;
+  }
+}
+
+/* Safe area insets for mobile devices with notches / home indicators */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
 }
 
 /* Cursor Modes */

@@ -43,13 +43,17 @@ const UserProfileDialog: React.FC<{
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 100,
+        padding: '16px',
       }}
       onClick={onClose}
     >
       <div
         className="glass-panel animate-fade-in"
         style={{
-          width: '400px',
+          width: '100%',
+          maxWidth: '400px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           padding: '24px',
           backgroundColor: '#121622',
         }}

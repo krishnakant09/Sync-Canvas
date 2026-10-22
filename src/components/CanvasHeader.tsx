@@ -13,6 +13,9 @@ import {
   Share2,
   Check,
   HardDrive,
+  Menu,
+  X,
+  User,
 } from 'lucide-react';
 import type { UserPresence, UserProfile, Viewport } from '../types/canvas';
 import type { ConnectionStatus } from '../hooks/useYjsRoom';
@@ -36,6 +39,7 @@ interface CanvasHeaderProps {
   onClearCanvas: () => void;
   onOpenShortcuts: () => void;
   totalElements: number;
+  isMobile?: boolean;
 }
 
 export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
@@ -57,11 +61,13 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
   onClearCanvas,
   onOpenShortcuts,
   totalElements,
+  isMobile = false,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
   const [isEditingRoom, setIsEditingRoom] = useState(false);
   const [roomInput, setRoomInput] = useState(roomName);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleCopyLink = () => {
     const url = new URL(window.location.href);
@@ -117,6 +123,368 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
         return 'Offline';
     }
   };
+
+  if (isMobile) {
+    return (
+      <>
+        <header
+          className="glass-panel"
+          role="banner"
+          style={{
+            position: 'absolute',
+            top: 'max(10px, env(safe-area-inset-top, 10px))',
+            left: '10px',
+            right: '10px',
+            height: '46px',
+            padding: '0 10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            zIndex: 50,
+          }}
+        >
+          {/* Mobile Brand */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div
+              style={{
+                width: '26px',
+                height: '26px',
+                borderRadius: '6px',
+                background: 'linear-gradient(135deg, #6366f1, #06b6d4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+              }}
+            >
+              <Sparkles size={14} />
+            </div>
+            <span
+              style={{
+                fontWeight: 800,
+                fontSize: '14px',
+                background: 'linear-gradient(135deg, #a5b4fc, #6366f1)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
+              SyncCanvas
+            </span>
+          </div>
+
+          {/* Compact Room Pill */}
+          <button
+            onClick={() => {
+              setRoomInput(roomName);
+              setIsEditingRoom(true);
+              setIsMobileMenuOpen(true);
+            }}
+            style={{
+              padding: '3px 8px',
+              fontSize: '11px',
+              fontWeight: 600,
+              fontFamily: 'var(--font-mono)',
+              borderRadius: '6px',
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-main)',
+              maxWidth: '110px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span style={{ color: 'var(--primary)' }}>#</span> {roomName}
+          </button>
+
+          {/* Mobile Right Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button
+              className="icon-btn"
+              style={{
+                width: '32px',
+                height: '32px',
+                background: copied ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                color: copied ? 'var(--accent-emerald)' : 'var(--text-muted)',
+              }}
+              onClick={handleCopyLink}
+              title="Share Room Link"
+              aria-label="Share Room Link"
+            >
+              {copied ? <Check size={14} /> : <Share2 size={14} />}
+            </button>
+
+            <button
+              onClick={onOpenProfileModal}
+              style={{
+                width: '26px',
+                height: '26px',
+                borderRadius: '50%',
+                backgroundColor: userProfile.color,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: 700,
+                border: '2px solid rgba(255,255,255,0.2)',
+              }}
+              title="Your Profile"
+              aria-label="Your Profile"
+            >
+              {userProfile.name ? userProfile.name[0].toUpperCase() : 'U'}
+            </button>
+
+            <button
+              className="icon-btn"
+              style={{ width: '32px', height: '32px' }}
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              title="Menu"
+              aria-label="Menu"
+            >
+              {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
+        </header>
+
+        {/* Hidden File Input for JSON import */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          accept=".json"
+          onChange={handleFileChange}
+        />
+
+        {/* Mobile Full Action Drawer */}
+        {isMobileMenuOpen && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(10px)',
+              zIndex: 90,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'flex-start',
+              padding: '12px',
+              paddingTop: 'max(60px, calc(env(safe-area-inset-top, 0px) + 60px))',
+            }}
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            <div
+              className="glass-panel animate-fade-in"
+              style={{
+                width: '100%',
+                maxHeight: 'calc(100vh - 80px)',
+                overflowY: 'auto',
+                padding: '16px',
+                backgroundColor: '#121622',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+                borderRadius: '16px',
+                border: '1px solid var(--border-subtle)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '15px' }}>
+                  <Sparkles size={16} color="var(--primary)" />
+                  Canvas Actions & Settings
+                </div>
+                <button
+                  className="icon-btn"
+                  style={{ width: '28px', height: '28px' }}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Status pill */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}>
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: getStatusColor(),
+                      boxShadow: `0 0 8px ${getStatusColor()}`,
+                    }}
+                  />
+                  {getStatusLabel()} ({totalElements} elements)
+                </div>
+                {isIndexedDBReady && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent-emerald)', fontWeight: 600 }}>
+                    <HardDrive size={11} /> Offline Cached
+                  </div>
+                )}
+              </div>
+
+              {/* Room Switcher */}
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                  Current Room
+                </label>
+                <form
+                  onSubmit={(e) => {
+                    handleRoomSubmit(e);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  style={{ display: 'flex', gap: '6px' }}
+                >
+                  <input
+                    value={roomInput}
+                    onChange={(e) => setRoomInput(e.target.value)}
+                    placeholder="Room name..."
+                    style={{ flex: 1, height: '36px', fontSize: '13px' }}
+                  />
+                  <button
+                    type="submit"
+                    style={{
+                      height: '36px',
+                      padding: '0 12px',
+                      borderRadius: '6px',
+                      backgroundColor: 'var(--primary)',
+                      color: '#ffffff',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Switch
+                  </button>
+                </form>
+              </div>
+
+              {/* Collaborators */}
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                  Online Peers ({remoteUsers.length + 1})
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '3px 8px',
+                      borderRadius: '12px',
+                      background: 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${userProfile.color}`,
+                      fontSize: '11px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: userProfile.color }} />
+                    {userProfile.name} (You)
+                  </div>
+                  {remoteUsers.map((peer) => (
+                    <div
+                      key={peer.clientId}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '3px 8px',
+                        borderRadius: '12px',
+                        background: 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${peer.user.color || '#6366f1'}`,
+                        fontSize: '11px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: peer.user.color || '#6366f1' }} />
+                      {peer.user.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Viewport Zoom */}
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                  Zoom: {Math.round(viewport.zoom * 100)}%
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                  <button onClick={onZoomOut} className="glass-panel" style={{ height: '36px', fontSize: '12px', fontWeight: 600 }}>
+                    <ZoomOut size={14} /> Out
+                  </button>
+                  <button onClick={onResetZoom} className="glass-panel" style={{ height: '36px', fontSize: '12px', fontWeight: 600 }}>
+                    100%
+                  </button>
+                  <button onClick={onZoomIn} className="glass-panel" style={{ height: '36px', fontSize: '12px', fontWeight: 600 }}>
+                    <ZoomIn size={14} /> In
+                  </button>
+                  <button onClick={() => { onFitContent(); setIsMobileMenuOpen(false); }} className="glass-panel" style={{ height: '36px', fontSize: '12px', fontWeight: 600 }}>
+                    <Maximize2 size={14} /> Fit
+                  </button>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
+                <button
+                  onClick={() => { onExportPNG(); setIsMobileMenuOpen(false); }}
+                  className="glass-panel"
+                  style={{ height: '38px', gap: '6px', fontSize: '12px', fontWeight: 600 }}
+                >
+                  <Download size={14} /> Export PNG
+                </button>
+                <button
+                  onClick={() => { onExportJSON(); setIsMobileMenuOpen(false); }}
+                  className="glass-panel"
+                  style={{ height: '38px', gap: '6px', fontSize: '12px', fontWeight: 600 }}
+                >
+                  <FileCode2 size={14} /> Export JSON
+                </button>
+                <button
+                  onClick={() => { fileInputRef.current?.click(); setIsMobileMenuOpen(false); }}
+                  className="glass-panel"
+                  style={{ height: '38px', gap: '6px', fontSize: '12px', fontWeight: 600 }}
+                >
+                  <Upload size={14} /> Import JSON
+                </button>
+                <button
+                  onClick={() => { onOpenProfileModal(); setIsMobileMenuOpen(false); }}
+                  className="glass-panel"
+                  style={{ height: '38px', gap: '6px', fontSize: '12px', fontWeight: 600 }}
+                >
+                  <User size={14} /> Edit Profile
+                </button>
+                <button
+                  onClick={() => { onOpenShortcuts(); setIsMobileMenuOpen(false); }}
+                  className="glass-panel"
+                  style={{ height: '38px', gap: '6px', fontSize: '12px', fontWeight: 600 }}
+                >
+                  <HelpCircle size={14} /> Gestures Guide
+                </button>
+                <button
+                  onClick={() => { onClearCanvas(); setIsMobileMenuOpen(false); }}
+                  className="glass-panel"
+                  style={{ height: '38px', gap: '6px', fontSize: '12px', fontWeight: 600, color: 'var(--accent-rose)' }}
+                >
+                  <Trash2 size={14} /> Clear Canvas
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <header

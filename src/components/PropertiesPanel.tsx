@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Trash2,
   Copy,
@@ -7,6 +7,9 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  Sliders,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import type { CanvasElement } from '../types/canvas';
 
@@ -17,6 +20,7 @@ interface PropertiesPanelProps {
   onDuplicateElements: () => void;
   onBringToFront: () => void;
   onSendToBack: () => void;
+  isMobile?: boolean;
 }
 
 const FILL_PALETTE = [
@@ -56,7 +60,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onDuplicateElements,
   onBringToFront,
   onSendToBack,
+  isMobile = false,
 }) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   if (selectedElements.length === 0) return null;
 
   const firstElem = selectedElements[0];
@@ -70,21 +77,53 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     });
   };
 
+  // Mobile collapsed floating pill
+  if (isMobile && isCollapsed) {
+    return (
+      <button
+        onClick={() => setIsCollapsed(false)}
+        className="glass-panel animate-fade-in"
+        style={{
+          position: 'absolute',
+          top: '68px',
+          left: '12px',
+          padding: '6px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontSize: '12px',
+          fontWeight: 700,
+          color: 'var(--text-main)',
+          zIndex: 45,
+          borderRadius: '20px',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+          background: 'rgba(18, 22, 34, 0.95)',
+          border: '1px solid var(--border-focus)',
+        }}
+      >
+        <Sliders size={14} color="var(--primary)" />
+        Style ({selectedElements.length})
+        <ChevronDown size={14} />
+      </button>
+    );
+  }
+
   return (
     <aside
       className="glass-panel animate-fade-in"
       aria-label="Element Properties"
       style={{
         position: 'absolute',
-        top: '76px',
-        left: '24px',
-        width: '260px',
-        padding: '16px',
+        top: isMobile ? '68px' : '76px',
+        left: isMobile ? '12px' : '24px',
+        width: isMobile ? 'calc(100vw - 24px)' : '260px',
+        maxWidth: isMobile ? '320px' : '260px',
+        padding: isMobile ? '12px' : '16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '14px',
+        gap: isMobile ? '10px' : '14px',
         zIndex: 40,
-        maxHeight: 'calc(100vh - 120px)',
+        maxHeight: isMobile ? '55vh' : 'calc(100vh - 120px)',
         overflowY: 'auto',
       }}
     >
@@ -93,11 +132,23 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           {isMulti ? `${selectedElements.length} Items Selected` : `${firstElem.type.toUpperCase()}`}
         </span>
         <div style={{ display: 'flex', gap: '4px' }}>
+          {isMobile && (
+            <button
+              className="icon-btn"
+              style={{ width: '28px', height: '28px' }}
+              onClick={() => setIsCollapsed(true)}
+              title="Minimize panel"
+              aria-label="Minimize panel"
+            >
+              <ChevronUp size={14} />
+            </button>
+          )}
           <button
             className="icon-btn"
             style={{ width: '28px', height: '28px' }}
             onClick={onDuplicateElements}
             data-tooltip="Duplicate (Ctrl+D)"
+            aria-label="Duplicate"
           >
             <Copy size={14} />
           </button>
@@ -106,6 +157,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             style={{ width: '28px', height: '28px', color: 'var(--accent-rose)' }}
             onClick={onDeleteElements}
             data-tooltip="Delete (Del)"
+            aria-label="Delete"
           >
             <Trash2 size={14} />
           </button>
