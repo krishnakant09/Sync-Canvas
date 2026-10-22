@@ -6,6 +6,15 @@ import type { CanvasElement, Point, UserPresence, UserProfile } from '../types/c
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
+export function getDefaultServerUrl(): string {
+  if (typeof window === 'undefined') return 'ws://localhost:1234';
+  if (window.location.port === '5173') {
+    return `ws://${window.location.hostname}:1234`;
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}`;
+}
+
 interface UseYjsRoomOptions {
   roomName: string;
   serverUrl?: string;
@@ -15,7 +24,7 @@ interface UseYjsRoomOptions {
 
 export function useYjsRoom({
   roomName,
-  serverUrl = 'ws://localhost:1234',
+  serverUrl = getDefaultServerUrl(),
   initialElements = [],
   userProfile,
 }: UseYjsRoomOptions) {

@@ -1,5 +1,5 @@
 {
-  "name": "new-folder",
+  "name": "sync-canvas",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -16,6 +16,7 @@
     "lucide-react": "^1.61.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "tsx": "^4.23.15",
     "ws": "^8.22.0",
     "y-indexeddb": "^9.0.12",
     "y-websocket": "^3.1.0",
@@ -29,7 +30,7 @@
     "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^6.1.2",
     "oxlint": "^1.88.0",
-    "tsx": "^4.23.15",
+    "tar": "^7.5.22",
     "typescript": "~6.0.3",
     "vite": "^8.3.4"
   }
