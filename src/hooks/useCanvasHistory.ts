@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { CanvasElement } from '../types/canvas';
+import type { CanvasElement } from '../types/canvas';
 
 const MAX_HISTORY = 50;
 

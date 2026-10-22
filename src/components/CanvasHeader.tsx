@@ -12,10 +12,9 @@ import {
   Sparkles,
   Share2,
   Check,
-  Radio,
 } from 'lucide-react';
-import { Viewport } from '../types/canvas';
-import { ConnectionStatus } from '../hooks/useYjsRoom';
+import type { Viewport } from '../types/canvas';
+import type { ConnectionStatus } from '../hooks/useYjsRoom';
 
 interface CanvasHeaderProps {
   viewport: Viewport;

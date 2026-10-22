@@ -12,7 +12,7 @@ import {
   Undo2,
   Redo2,
 } from 'lucide-react';
-import { ToolType } from '../types/canvas';
+import type { ToolType } from '../types/canvas';
 
 interface ToolbarProps {
   activeTool: ToolType;

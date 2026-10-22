@@ -1,5 +1,4 @@
-import React from 'react';
-import {
+import type {
   CanvasElement,
   DragState,
   Point,
@@ -55,7 +54,6 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
   };
 
   const renderElement = (el: CanvasElement, isPreview = false) => {
-    const isSelected = selectedIds.has(el.id);
     const isEditing = editingId === el.id;
     const { x, y, width, height } = normalizeRect(el.x, el.y, el.width, el.height);
 

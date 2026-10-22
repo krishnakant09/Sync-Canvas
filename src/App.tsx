@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import {
+import type {
   CanvasElement,
   DragState,
   Point,
@@ -327,7 +327,7 @@ export const App: React.FC = () => {
   // ==========================================
   // MOUSE & POINTER EVENTS ON CANVAS
   // ==========================================
-  const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button === 1 || isSpacePressed || activeTool === 'hand') {
       setDragState({
         type: 'pan',
@@ -504,7 +504,7 @@ export const App: React.FC = () => {
     });
   };
 
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const worldPoint = screenToWorld(e.clientX, e.clientY, viewport);
     setCursorPos(worldPoint);
 

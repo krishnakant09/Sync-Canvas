@@ -1,5 +1,5 @@
 import React from 'react';
-import { Viewport } from '../types/canvas';
+import type { Viewport } from '../types/canvas';
 
 interface CanvasGridProps {
   viewport: Viewport;

@@ -8,7 +8,7 @@ import {
   AlignCenter,
   AlignRight,
 } from 'lucide-react';
-import { CanvasElement } from '../types/canvas';
+import type { CanvasElement } from '../types/canvas';
 
 interface PropertiesPanelProps {
   selectedElements: CanvasElement[];

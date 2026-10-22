@@ -1,4 +1,4 @@
-import { CanvasElement, Point, ResizeHandle, SelectionBounds, Viewport } from '../types/canvas';
+import type { CanvasElement, Point, ResizeHandle, SelectionBounds, Viewport } from '../types/canvas';
 
 export function screenToWorld(screenX: number, screenY: number, viewport: Viewport): Point {
   return {

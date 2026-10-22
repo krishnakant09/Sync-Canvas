@@ -1,4 +1,4 @@
-import { CanvasElement } from '../types/canvas';
+import type { CanvasElement } from '../types/canvas';
 import { getSelectionBoundingBox } from './math';
 
 export function exportToJSON(elements: CanvasElement[], filename = 'sync-canvas-board.json') {
