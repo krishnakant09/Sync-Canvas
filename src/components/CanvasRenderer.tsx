@@ -4,9 +4,12 @@ import type {
   Point,
   ResizeHandle,
   SelectionBounds,
+  UserPresence,
   Viewport,
 } from '../types/canvas';
 import { normalizeRect } from '../utils/math';
+import { MultiplayerCursors } from './MultiplayerCursors';
+import { RemoteSelections } from './RemoteSelections';
 
 interface CanvasRendererProps {
   svgRef: React.RefObject<SVGSVGElement | null>;
@@ -20,6 +23,7 @@ interface CanvasRendererProps {
   onUpdateText: (id: string, text: string) => void;
   onFinishEditing: () => void;
   previewElement: CanvasElement | null;
+  remoteUsers: UserPresence[];
 }
 
 export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
@@ -34,6 +38,7 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
   onUpdateText,
   onFinishEditing,
   previewElement,
+  remoteUsers,
 }) => {
   // Render smooth SVG path for freehand drawing
   const renderDrawPath = (points: Point[] = []): string => {
@@ -329,6 +334,9 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
         {/* Render persistent canvas elements */}
         {elements.map((el) => renderElement(el))}
 
+        {/* Remote Collaborators Selection Halos */}
+        <RemoteSelections elements={elements} remoteUsers={remoteUsers} viewport={viewport} />
+
         {/* In-flight creation preview */}
         {previewElement && renderElement(previewElement, true)}
 
@@ -350,6 +358,9 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
             pointerEvents="none"
           />
         )}
+
+        {/* Real-time Multiplayer Cursors */}
+        <MultiplayerCursors remoteUsers={remoteUsers} viewport={viewport} />
       </g>
     </svg>
   );

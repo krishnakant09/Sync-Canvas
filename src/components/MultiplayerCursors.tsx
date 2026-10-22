@@ -1,0 +1,66 @@
+import React from 'react';
+import type { UserPresence, Viewport } from '../types/canvas';
+
+interface MultiplayerCursorsProps {
+  remoteUsers: UserPresence[];
+  viewport: Viewport;
+}
+
+export const MultiplayerCursors: React.FC<MultiplayerCursorsProps> = ({ remoteUsers, viewport }) => {
+  return (
+    <g className="multiplayer-cursors-layer" pointerEvents="none">
+      {remoteUsers.map((peer) => {
+        if (!peer.cursor) return null;
+        const { x, y } = peer.cursor;
+        const color = peer.user.color || '#6366f1';
+        const name = peer.user.name || 'Anonymous';
+
+        // Size adjustment according to zoom so cursor remains readable
+        const scale = 1 / Math.max(0.4, Math.min(2, viewport.zoom));
+
+        return (
+          <g
+            key={peer.clientId}
+            transform={`translate(${x}, ${y}) scale(${scale})`}
+            style={{
+              transition: 'transform 0.08s ease-out',
+            }}
+          >
+            {/* Custom SVG Figma-Style Cursor Arrow */}
+            <path
+              d="M 0 0 L 0 16 L 4.5 12.5 L 8 18 L 10.5 16.5 L 7 11 L 12 11 Z"
+              fill={color}
+              stroke="#ffffff"
+              strokeWidth="1.2"
+              filter="drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4))"
+            />
+
+            {/* Floating Name Badge */}
+            <g transform="translate(14, 18)">
+              <rect
+                x="0"
+                y="0"
+                rx="4"
+                ry="4"
+                width={Math.max(40, name.length * 7.5 + 16)}
+                height="20"
+                fill={color}
+                filter="drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35))"
+              />
+              <text
+                x="8"
+                y="14"
+                fill="#ffffff"
+                fontSize="11"
+                fontWeight="600"
+                fontFamily="var(--font-sans)"
+              >
+                {name}
+              </text>
+            </g>
+          </g>
+        );
+      })}
+    </g>
+  );
+};

@@ -5,6 +5,7 @@ import type {
   Point,
   ResizeHandle,
   ToolType,
+  UserProfile,
   Viewport,
 } from './types/canvas';
 import {
@@ -17,6 +18,7 @@ import {
   screenToWorld,
 } from './utils/math';
 import { exportToJSON, exportToPNG } from './utils/export';
+import { getStoredUserProfile } from './utils/user';
 import { useYjsRoom } from './hooks/useYjsRoom';
 import { CanvasGrid } from './components/CanvasGrid';
 import { Toolbar } from './components/Toolbar';
@@ -24,6 +26,7 @@ import { PropertiesPanel } from './components/PropertiesPanel';
 import { CanvasHeader } from './components/CanvasHeader';
 import { CanvasRenderer } from './components/CanvasRenderer';
 import { ShortcutsModal } from './components/ShortcutsModal';
+import { UserProfileModal } from './components/UserProfileModal';
 
 // Initial welcoming architectural demo elements for new rooms
 const INITIAL_ELEMENTS: CanvasElement[] = [
@@ -32,14 +35,14 @@ const INITIAL_ELEMENTS: CanvasElement[] = [
     type: 'sticky',
     x: 80,
     y: 80,
-    width: 240,
+    width: 250,
     height: 190,
     fill: '#fef08a',
     stroke: 'transparent',
     strokeWidth: 1,
     opacity: 1,
     zIndex: 1,
-    text: '🚀 Welcome to SyncCanvas!\n\nPhase 2 Real-Time CRDT Synchronization is now LIVE!\n\nOpen this URL in another tab and watch changes sync in sub-30ms with zero merge conflicts.',
+    text: '🚀 Welcome to SyncCanvas!\n\nPhase 3 Multi-User Presence & Offline Resilience is active.\n\nOpen a second tab to see live colored cursors and selection halos in action!',
     fontSize: 15,
     updatedAt: Date.now(),
   },
@@ -69,7 +72,7 @@ const INITIAL_ELEMENTS: CanvasElement[] = [
     strokeWidth: 1,
     opacity: 1,
     zIndex: 3,
-    text: 'Frontend Engine\nSVG + React 19',
+    text: 'Presence Layer\nYjs Awareness',
     fontSize: 16,
     textAlign: 'center',
     updatedAt: Date.now(),
@@ -114,7 +117,7 @@ const INITIAL_ELEMENTS: CanvasElement[] = [
     strokeWidth: 1,
     opacity: 1,
     zIndex: 3,
-    text: 'CRDT Gateway\nws://localhost:1234',
+    text: 'Offline Persistence\ny-indexeddb',
     fontSize: 16,
     textAlign: 'center',
     updatedAt: Date.now(),
@@ -131,7 +134,7 @@ const INITIAL_ELEMENTS: CanvasElement[] = [
     strokeWidth: 1,
     opacity: 1,
     zIndex: 1,
-    text: '⚡ Conflict-Free Replicated Data Types:\n\nAll board objects are stored in a Yjs Y.Map. Changes emit compact binary deltas broadcasted over WebSockets to every connected peer!',
+    text: '💡 Offline-First Reliability:\n\nIf your network drops, changes save to IndexedDB instantly. When reconnected, updates merge seamlessly without overwriting collaborators!',
     fontSize: 15,
     updatedAt: Date.now(),
   },
@@ -140,16 +143,25 @@ const INITIAL_ELEMENTS: CanvasElement[] = [
 export const App: React.FC = () => {
   const svgRef = useRef<SVGSVGElement>(null);
 
+  // Local user profile (customizable display name & color)
+  const [userProfile, setUserProfile] = useState<UserProfile>(getStoredUserProfile);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
   // Room name derived from URL query parameter (e.g. ?room=team-canvas)
   const [roomName, setRoomName] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('room') || 'main-canvas';
   });
 
-  // Real-Time Yjs Synchronization Hook
+  // Real-Time Yjs Synchronization & Awareness Hook
   const {
     elements,
     status: connectionStatus,
+    isIndexedDBReady,
+    remoteUsers,
+    updateCursor,
+    updateSelectedElementIds,
+    updateUserProfile,
     setElement,
     setElementsBatch,
     deleteElementsBatch,
@@ -161,6 +173,7 @@ export const App: React.FC = () => {
   } = useYjsRoom({
     roomName,
     initialElements: INITIAL_ELEMENTS,
+    userProfile,
   });
 
   // Local transient overrides for high-performance 60 FPS dragging before committing to Yjs
@@ -187,6 +200,11 @@ export const App: React.FC = () => {
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [previewElement, setPreviewElement] = useState<CanvasElement | null>(null);
 
+  // Broadcast selected elements to awareness whenever selection changes
+  useEffect(() => {
+    updateSelectedElementIds(Array.from(selectedIds));
+  }, [selectedIds, updateSelectedElementIds]);
+
   // Render elements with local transient dragging overrides applied
   const renderedElements = elements.map((el) => {
     const override = transientOverrides.get(el.id);
@@ -204,6 +222,12 @@ export const App: React.FC = () => {
     window.history.pushState({}, '', url.toString());
     setRoomName(newRoom);
     setSelectedIds(new Set());
+  };
+
+  // Profile update handler
+  const handleSaveProfile = (updated: UserProfile) => {
+    setUserProfile(updated);
+    updateUserProfile(updated);
   };
 
   // ==========================================
@@ -508,6 +532,9 @@ export const App: React.FC = () => {
     const worldPoint = screenToWorld(e.clientX, e.clientY, viewport);
     setCursorPos(worldPoint);
 
+    // Broadcast cursor position to remote collaborators via Awareness
+    updateCursor(worldPoint);
+
     if (!dragState) return;
 
     if (dragState.type === 'pan' && dragState.initialViewport) {
@@ -594,11 +621,15 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleMouseLeave = () => {
+    // Clear cursor from remote peer view when mouse leaves canvas window
+    updateCursor(null);
+  };
+
   const handleMouseUp = () => {
     if (!dragState) return;
 
     if (dragState.type === 'move' || dragState.type === 'resize') {
-      // Commit transient overrides into Yjs CRDT map
       if (transientOverrides.size > 0) {
         const elementsToUpdate: CanvasElement[] = [];
         transientOverrides.forEach((override, id) => {
@@ -651,7 +682,7 @@ export const App: React.FC = () => {
         setIsSpacePressed(true);
       }
 
-      // Undo / Redo (CRDT Distributed UndoManager)
+      // Undo / Redo
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -741,6 +772,10 @@ export const App: React.FC = () => {
         viewport={viewport}
         connectionStatus={connectionStatus}
         roomName={roomName}
+        userProfile={userProfile}
+        remoteUsers={remoteUsers}
+        isIndexedDBReady={isIndexedDBReady}
+        onOpenProfileModal={() => setIsProfileModalOpen(true)}
         onChangeRoom={handleRoomChange}
         onZoomIn={() => handleZoom(1.2)}
         onZoomOut={() => handleZoom(0.8)}
@@ -779,6 +814,7 @@ export const App: React.FC = () => {
         style={{ width: '100%', height: '100%' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
         onMouseUp={handleMouseUp}
       >
         <CanvasRenderer
@@ -793,6 +829,7 @@ export const App: React.FC = () => {
           onUpdateText={(id, text) => handleUpdateElement(id, { text })}
           onFinishEditing={() => setEditingId(null)}
           previewElement={previewElement}
+          remoteUsers={remoteUsers}
         />
       </div>
 
@@ -830,12 +867,20 @@ export const App: React.FC = () => {
         <span>Zoom: {Math.round(viewport.zoom * 100)}%</span>
         <span style={{ color: 'var(--border-subtle)' }}>|</span>
         <span style={{ color: connectionStatus === 'connected' ? 'var(--accent-emerald)' : 'var(--accent-amber)' }}>
-          ● {connectionStatus.toUpperCase()}
+          ● {connectionStatus.toUpperCase()} ({remoteUsers.length} peers)
         </span>
       </div>
 
       {/* Shortcuts Guide Modal */}
       <ShortcutsModal isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
+
+      {/* User Profile Customization Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentProfile={userProfile}
+        onSaveProfile={handleSaveProfile}
+      />
     </div>
   );
 };

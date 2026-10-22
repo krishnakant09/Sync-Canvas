@@ -84,10 +84,29 @@ SyncCanvas is a high-performance, real-time collaborative whiteboard and infinit
 
 ---
 
+## 👥 Phase 3: Completed Features (Multi-User Presence & Offline Resilience)
+
+- [x] **Live Multiplayer Cursors (`MultiplayerCursors.tsx`):**
+  - Real-time mouse tracking broadcasted through the binary Yjs Awareness protocol.
+  - Directional SVG cursor pointers styled with unique collaborator colors.
+  - Floating name badges with smooth interpolation.
+- [x] **Remote Selection Halos (`RemoteSelections.tsx`):**
+  - Colored dashed bounding boxes highlighting objects currently selected by other collaborators.
+  - Name tags identifying who is active on each element (Figma-style).
+- [x] **Collaborator Profile Customizer (`UserProfileModal.tsx` & `user.ts`):**
+  - Custom display name and avatar color selection.
+  - Persistent user profile across sessions via `localStorage`.
+  - Collaborators avatar stack in top navbar with real-time peer count.
+- [x] **Offline-First Persistence (`y-indexeddb`):**
+  - Full local persistence into browser IndexedDB.
+  - Edits made while offline are saved instantly and merge seamlessly upon reconnection with zero data loss.
+
+---
+
 ## 🛠️ Tech Stack
 
 - **Frontend:** React 19, TypeScript, Vite
-- **Real-Time & CRDT:** Yjs, `y-websocket`, `y-protocols`, `lib0`
+- **Real-Time & CRDT:** Yjs, `y-websocket`, `y-indexeddb`, `y-protocols`, `lib0`
 - **Backend Server:** Node.js, TypeScript, `ws`, `http`, `tsx`
 - **Icons & Styling:** Lucide React, Plus Jakarta Sans, JetBrains Mono
 
@@ -105,7 +124,7 @@ Server listens on port `1234` with metrics at `http://localhost:1234/stats`.
 ```bash
 npm run dev
 ```
-Open **[http://127.0.0.1:5173](http://127.0.0.1:5173)** in two separate browser windows to test real-time collaboration!
+Open **[http://127.0.0.1:5173](http://127.0.0.1:5173)** in two separate browser windows to test real-time collaboration with live cursors and selection halos!
 
 ---
 
@@ -136,5 +155,5 @@ Open **[http://127.0.0.1:5173](http://127.0.0.1:5173)** in two separate browser 
 
 - **Phase 1 (Completed):** Interactive Canvas Engine, local state transformations, shape rendering, export tools.
 - **Phase 2 (Completed):** WebSocket Gateway Server + Yjs `Y.Doc` binding for real-time document synchronization.
-- **Phase 3 (Next):** Multi-user live awareness (cursor tracking with user names & colors, active element selection halos) + `y-indexeddb` offline sync.
-- **Phase 4:** Redis Pub/Sub horizontal scaling, PostgreSQL auth/rooms, and production deployment.
+- **Phase 3 (Completed):** Multi-user live awareness (cursor tracking, selection halos, customizable profiles) + `y-indexeddb` offline sync.
+- **Phase 4 (Next):** Redis Pub/Sub horizontal scaling, snapshot compaction engine, and production deployment.

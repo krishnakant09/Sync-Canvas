@@ -79,3 +79,17 @@ export interface SelectionBounds {
   width: number;
   height: number;
 }
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface UserPresence {
+  clientId: number;
+  user: UserProfile;
+  cursor?: Point | null;
+  selectedElementIds?: string[];
+  lastActive?: number;
+}

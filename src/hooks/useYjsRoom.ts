@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
-import type { CanvasElement } from '../types/canvas';
+import { IndexeddbPersistence } from 'y-indexeddb';
+import type { CanvasElement, Point, UserPresence, UserProfile } from '../types/canvas';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
@@ -9,19 +10,24 @@ interface UseYjsRoomOptions {
   roomName: string;
   serverUrl?: string;
   initialElements?: CanvasElement[];
+  userProfile: UserProfile;
 }
 
 export function useYjsRoom({
   roomName,
   serverUrl = 'ws://localhost:1234',
   initialElements = [],
+  userProfile,
 }: UseYjsRoomOptions) {
   const [elements, setElements] = useState<CanvasElement[]>([]);
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [synced, setSynced] = useState(false);
+  const [isIndexedDBReady, setIsIndexedDBReady] = useState(false);
+  const [remoteUsers, setRemoteUsers] = useState<UserPresence[]>([]);
 
   const docRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
+  const idbRef = useRef<IndexeddbPersistence | null>(null);
   const yMapRef = useRef<Y.Map<CanvasElement> | null>(null);
   const undoManagerRef = useRef<Y.UndoManager | null>(null);
 
@@ -32,16 +38,29 @@ export function useYjsRoom({
     const doc = new Y.Doc();
     docRef.current = doc;
 
+    // 1. Offline Persistence via IndexedDB
+    const idb = new IndexeddbPersistence(`sync-canvas-${roomName}`, doc);
+    idbRef.current = idb;
+
+    idb.on('synced', () => {
+      setIsIndexedDBReady(true);
+    });
+
+    // 2. Real-time WebSocket Gateway
     const provider = new WebsocketProvider(serverUrl, roomName, doc, {
       connect: true,
       params: { room: roomName },
     });
     providerRef.current = provider;
 
+    // 3. Set Local User Awareness (Presence)
+    provider.awareness.setLocalStateField('user', userProfile);
+
+    // 4. CRDT Elements Map
     const yElements = doc.getMap<CanvasElement>('elements');
     yMapRef.current = yElements;
 
-    // Distributed UndoManager scoped to elements map
+    // 5. Distributed UndoManager
     const undoManager = new Y.UndoManager(yElements, {
       trackedOrigins: new Set([null, provider]),
     });
@@ -55,17 +74,16 @@ export function useYjsRoom({
     undoManager.on('stack-item-added', updateUndoRedoFlags);
     undoManager.on('stack-item-popped', updateUndoRedoFlags);
 
-    // Connection lifecycle
+    // 6. Connection Status
     provider.on('status', (event: { status: 'connecting' | 'connected' | 'disconnected' }) => {
       setStatus(event.status);
     });
 
-    // When synchronized with the server
+    // 7. Yjs Document Sync Handshake
     provider.on('sync', (isSynced: boolean) => {
       setSynced(isSynced);
 
       if (isSynced) {
-        // If the shared room is completely empty, populate with starter architectural elements
         if (yElements.size === 0 && initialElements.length > 0) {
           doc.transact(() => {
             initialElements.forEach((el) => {
@@ -76,7 +94,7 @@ export function useYjsRoom({
       }
     });
 
-    // Observer for real-time changes from local edits or remote peers
+    // 8. Elements Map Observer
     const handleMapChange = () => {
       const items = Array.from(yElements.values()).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
       setElements(items);
@@ -84,21 +102,66 @@ export function useYjsRoom({
     };
 
     yElements.observe(handleMapChange);
-
-    // Initial load
     handleMapChange();
+
+    // 9. Awareness / Presence Observer
+    const handleAwarenessChange = () => {
+      const awareness = provider.awareness;
+      const states = awareness.getStates();
+      const peers: UserPresence[] = [];
+
+      states.forEach((state: any, clientId: number) => {
+        if (clientId !== doc.clientID && state.user) {
+          peers.push({
+            clientId,
+            user: state.user,
+            cursor: state.cursor || null,
+            selectedElementIds: state.selectedElementIds || [],
+            lastActive: Date.now(),
+          });
+        }
+      });
+
+      setRemoteUsers(peers);
+    };
+
+    provider.awareness.on('change', handleAwarenessChange);
 
     return () => {
       yElements.unobserve(handleMapChange);
+      provider.awareness.off('change', handleAwarenessChange);
       undoManager.destroy();
       provider.destroy();
+      idb.destroy();
       doc.destroy();
       docRef.current = null;
       providerRef.current = null;
+      idbRef.current = null;
       yMapRef.current = null;
       undoManagerRef.current = null;
     };
   }, [roomName, serverUrl]);
+
+  // Update local cursor in awareness
+  const updateCursor = useCallback((point: Point | null) => {
+    const provider = providerRef.current;
+    if (!provider) return;
+    provider.awareness.setLocalStateField('cursor', point);
+  }, []);
+
+  // Update selected elements in awareness
+  const updateSelectedElementIds = useCallback((selectedIds: string[]) => {
+    const provider = providerRef.current;
+    if (!provider) return;
+    provider.awareness.setLocalStateField('selectedElementIds', selectedIds);
+  }, []);
+
+  // Update local user profile in awareness
+  const updateUserProfile = useCallback((profile: UserProfile) => {
+    const provider = providerRef.current;
+    if (!provider) return;
+    provider.awareness.setLocalStateField('user', profile);
+  }, []);
 
   // Set or update a single element in the CRDT map
   const setElement = useCallback((element: CanvasElement) => {
@@ -107,7 +170,7 @@ export function useYjsRoom({
     yMap.set(element.id, { ...element, updatedAt: Date.now() });
   }, []);
 
-  // Batch transactional update (e.g., dragging multiple items)
+  // Batch transactional update
   const setElementsBatch = useCallback((elementsToUpdate: CanvasElement[]) => {
     const doc = docRef.current;
     const yMap = yMapRef.current;
@@ -162,6 +225,11 @@ export function useYjsRoom({
     elements,
     status,
     synced,
+    isIndexedDBReady,
+    remoteUsers,
+    updateCursor,
+    updateSelectedElementIds,
+    updateUserProfile,
     setElement,
     setElementsBatch,
     deleteElement,
@@ -171,6 +239,5 @@ export function useYjsRoom({
     redo,
     canUndo,
     canRedo,
-    provider: providerRef.current,
   };
 }
