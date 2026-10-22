@@ -1,4 +1,6 @@
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';
@@ -6,7 +8,11 @@ import * as awarenessProtocol from 'y-protocols/awareness';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 
+import { saveSnapshot, loadSnapshot, listSnapshots } from './storage';
+import { initRedis, publishRoomUpdate, isRedisConnected, getInstanceId } from './redis';
+
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 1234;
+const CLIENT_DIST_DIR = path.join(process.cwd(), 'dist');
 
 const messageSync = 0;
 const messageAwareness = 1;
@@ -22,6 +28,8 @@ class RoomDoc {
   doc: Y.Doc;
   awareness: awarenessProtocol.Awareness;
   conns: Map<WebSocket, ClientConnection>;
+  private snapshotTimeout: NodeJS.Timeout | null = null;
+  lastCompacted: number = Date.now();
 
   constructor(name: string) {
     this.name = name;
@@ -29,7 +37,7 @@ class RoomDoc {
     this.awareness = new awarenessProtocol.Awareness(this.doc);
     this.conns = new Map();
 
-    // Broadcast local doc updates to all connected clients in this room
+    // 1. Broadcast doc updates to locally connected clients
     this.doc.on('update', (update: Uint8Array, origin: any) => {
       const encoder = encoding.createEncoder();
       encoding.writeVarUint(encoder, messageSync);
@@ -41,9 +49,17 @@ class RoomDoc {
           send(ws, message);
         }
       });
+
+      // 2. Publish to Redis cluster if the update originated locally (not from Redis)
+      if (origin !== 'redis') {
+        publishRoomUpdate(this.name, update);
+      }
+
+      // 3. Debounced Snapshot Compaction (compresses CRDT log after 10 seconds of idle)
+      this.scheduleSnapshot();
     });
 
-    // Broadcast awareness updates (cursors, user details) to clients
+    // Broadcast awareness updates (cursors, presence) to clients
     this.awareness.on(
       'update',
       ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }, origin: any) => {
@@ -64,17 +80,43 @@ class RoomDoc {
       }
     );
   }
+
+  scheduleSnapshot() {
+    if (this.snapshotTimeout) {
+      clearTimeout(this.snapshotTimeout);
+    }
+    this.snapshotTimeout = setTimeout(() => {
+      this.compactAndSave();
+    }, 10000);
+  }
+
+  async compactAndSave() {
+    try {
+      const meta = await saveSnapshot(this.name, this.doc);
+      this.lastCompacted = Date.now();
+      console.log(`[SyncCanvas Compaction] 📦 Compacted room "${this.name}" snapshot (${meta.sizeBytes} bytes)`);
+    } catch (err: any) {
+      console.error(`[SyncCanvas Compaction] Failed to save snapshot for "${this.name}":`, err.message);
+    }
+  }
 }
 
 // Global registry of active rooms
 const rooms = new Map<string, RoomDoc>();
 
-function getOrCreateRoom(roomName: string): RoomDoc {
+async function getOrCreateRoom(roomName: string): Promise<RoomDoc> {
   let room = rooms.get(roomName);
   if (!room) {
     room = new RoomDoc(roomName);
     rooms.set(roomName, room);
-    console.log(`[SyncCanvas Server] Created room: "${roomName}"`);
+
+    // Load persisted state snapshot from disk if exists
+    const restored = await loadSnapshot(roomName, room.doc);
+    if (restored) {
+      console.log(`[SyncCanvas Storage] 📥 Restored snapshot for room "${roomName}" from disk.`);
+    } else {
+      console.log(`[SyncCanvas Server] Initialized fresh room: "${roomName}"`);
+    }
   }
   return room;
 }
@@ -90,11 +132,19 @@ function send(ws: WebSocket, message: Uint8Array) {
   }
 }
 
-// HTTP Server for Health Checks and Stats
-const server = http.createServer((req, res) => {
-  // CORS headers
+// Initialize Redis Horizontal Pub/Sub
+initRedis((roomName, update) => {
+  const room = rooms.get(roomName);
+  if (room) {
+    // Apply update received from another server node in the cluster
+    Y.applyUpdate(room.doc, update, 'redis');
+  }
+});
+
+// HTTP Request Handler (REST API, Telemetry, and Production Static Assets)
+const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -103,7 +153,24 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.url === '/health' || req.url === '/stats') {
+  const url = new URL(req.url || '/', `http://${req.headers.host}`);
+
+  // Health Endpoint
+  if (url.pathname === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        status: 'healthy',
+        uptime: process.uptime(),
+        instanceId: getInstanceId(),
+        redisConnected: isRedisConnected(),
+      })
+    );
+    return;
+  }
+
+  // Telemetry & Metrics Endpoint
+  if (url.pathname === '/stats' || url.pathname === '/api/stats') {
     const totalConnections = Array.from(rooms.values()).reduce(
       (acc, room) => acc + room.conns.size,
       0
@@ -111,18 +178,30 @@ const server = http.createServer((req, res) => {
     const roomList = Array.from(rooms.entries()).map(([name, r]) => ({
       name,
       clients: r.conns.size,
+      lastCompacted: r.lastCompacted,
+      elementsCount: r.doc.getMap('elements').size,
     }));
+
+    const memoryUsage = process.memoryUsage();
+    const snapshots = await listSnapshots();
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(
       JSON.stringify(
         {
+          service: 'SyncCanvas Real-Time Gateway Cluster',
+          instanceId: getInstanceId(),
           status: 'healthy',
-          service: 'SyncCanvas Real-Time Gateway',
           uptime: process.uptime(),
           totalRooms: rooms.size,
           totalConnections,
+          redisClusterActive: isRedisConnected(),
+          memory: {
+            rssMB: Math.round(memoryUsage.rss / 1024 / 1024),
+            heapUsedMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+          },
           rooms: roomList,
+          persistedSnapshots: snapshots,
         },
         null,
         2
@@ -131,15 +210,66 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Snapshot list endpoint
+  if (url.pathname === '/api/snapshots') {
+    const snapshots = await listSnapshots();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(snapshots, null, 2));
+    return;
+  }
+
+  // Manual Compaction Trigger
+  if (req.method === 'POST' && url.pathname.startsWith('/api/rooms/') && url.pathname.endsWith('/compact')) {
+    const parts = url.pathname.split('/');
+    const roomName = decodeURIComponent(parts[3] || '');
+    const room = rooms.get(roomName);
+
+    if (room) {
+      await room.compactAndSave();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, message: `Room "${roomName}" compacted and saved.` }));
+    } else {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: `Room "${roomName}" not found.` }));
+    }
+    return;
+  }
+
+  // Production Static File Serving (when built frontend is in dist/)
+  if (fs.existsSync(CLIENT_DIST_DIR)) {
+    let filePath = path.join(CLIENT_DIST_DIR, url.pathname === '/' ? 'index.html' : url.pathname);
+    if (!fs.existsSync(filePath)) {
+      filePath = path.join(CLIENT_DIST_DIR, 'index.html'); // SPA fallback
+    }
+
+    const ext = path.extname(filePath);
+    const mimeTypes: Record<string, string> = {
+      '.html': 'text/html',
+      '.js': 'application/javascript',
+      '.css': 'text/css',
+      '.svg': 'image/svg+xml',
+      '.png': 'image/png',
+      '.json': 'application/json',
+    };
+
+    try {
+      const data = await fs.promises.readFile(filePath);
+      res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
+      res.end(data);
+      return;
+    } catch (e) {
+      // Fall through to 404
+    }
+  }
+
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('SyncCanvas Real-Time WebSocket Server is running.');
+  res.end('SyncCanvas Real-Time WebSocket Gateway & Compaction Engine is running.');
 });
 
 // WebSocket Server attached to the HTTP server
 const wss = new WebSocketServer({ server });
 
-wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
-  // Parse room from URL path or query string (e.g. ws://localhost:1234/my-canvas or ?room=my-canvas)
+wss.on('connection', async (ws: WebSocket, req: http.IncomingMessage) => {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
   let roomName = url.searchParams.get('room');
   if (!roomName) {
@@ -147,7 +277,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     roomName = pathname ? decodeURIComponent(pathname) : 'default-room';
   }
 
-  const room = getOrCreateRoom(roomName);
+  const room = await getOrCreateRoom(roomName);
   const clientConn: ClientConnection = {
     ws,
     isAlive: true,
@@ -157,18 +287,17 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
   console.log(`[SyncCanvas Server] Client connected to room "${roomName}". Room clients: ${room.conns.size}`);
 
-  // Setup Ping / Pong heartbeat
   ws.on('pong', () => {
     clientConn.isAlive = true;
   });
 
-  // Step 1: Send SyncStep1 to newly connected client to request missing state
+  // Step 1: Send SyncStep1 to newly connected client
   const encoder = encoding.createEncoder();
   encoding.writeVarUint(encoder, messageSync);
   syncProtocol.writeSyncStep1(encoder, room.doc);
   send(ws, encoding.toUint8Array(encoder));
 
-  // Step 2: Send current awareness states (cursors, users)
+  // Step 2: Send current awareness states (collaborators, cursors)
   const awarenessStates = room.awareness.getStates();
   if (awarenessStates.size > 0) {
     const awarenessEncoder = encoding.createEncoder();
@@ -180,7 +309,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     send(ws, encoding.toUint8Array(awarenessEncoder));
   }
 
-  // Handle incoming binary messages from client
+  // Handle incoming messages
   ws.on('message', (data: ArrayBuffer | Buffer) => {
     try {
       const uint8 = new Uint8Array(data as any);
@@ -202,29 +331,25 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
           awarenessProtocol.applyAwarenessUpdate(room.awareness, update, ws);
           break;
         }
-        default:
-          console.warn(`[SyncCanvas Server] Unknown message type: ${messageType}`);
       }
     } catch (err: any) {
       console.error('[SyncCanvas Server] Message processing error:', err.message);
     }
   });
 
-  // Clean up when client disconnects
+  // Handle disconnect
   ws.on('close', () => {
     room.conns.delete(ws);
-    // Remove client's awareness states
     const statesToRemove = Array.from(clientConn.controlledIds);
     if (statesToRemove.length > 0) {
       awarenessProtocol.removeAwarenessStates(room.awareness, statesToRemove, null);
     }
-    console.log(
-      `[SyncCanvas Server] Client disconnected from room "${roomName}". Room clients: ${room.conns.size}`
-    );
+    console.log(`[SyncCanvas Server] Client left room "${roomName}". Active clients: ${room.conns.size}`);
 
-    // Optional: Clean up empty rooms after idle timeout if needed
+    // If room is now empty, immediately compact and save state to disk
     if (room.conns.size === 0) {
-      console.log(`[SyncCanvas Server] Room "${roomName}" is currently empty.`);
+      console.log(`[SyncCanvas Server] Room "${roomName}" is idle. Compacting snapshot to disk...`);
+      room.compactAndSave();
     }
   });
 
@@ -233,12 +358,12 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   });
 });
 
-// Periodic ping to drop dead/stale connections every 30s
+// Periodic ping to drop dead sockets every 30s
 const pingInterval = setInterval(() => {
   rooms.forEach((room) => {
     room.conns.forEach((clientConn, ws) => {
       if (!clientConn.isAlive) {
-        console.log(`[SyncCanvas Server] Terminating inactive socket in room "${room.name}"`);
+        console.log(`[SyncCanvas Server] Pruning inactive socket in room "${room.name}"`);
         ws.terminate();
         return;
       }
@@ -254,8 +379,10 @@ server.on('close', () => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`=======================================================`);
-  console.log(`⚡ SyncCanvas Real-Time Server listening on port ${PORT}`);
-  console.log(`📊 Health & Stats Endpoint: http://localhost:${PORT}/stats`);
+  console.log(`⚡ SyncCanvas Gateway & Compaction Engine (Port ${PORT})`);
+  console.log(`🆔 Instance ID: ${getInstanceId()}`);
+  console.log(`📊 Metrics API: http://localhost:${PORT}/stats`);
+  console.log(`💾 Snapshots API: http://localhost:${PORT}/api/snapshots`);
   console.log(`🔌 WebSocket Endpoint: ws://localhost:${PORT}/[room-name]`);
   console.log(`=======================================================`);
 });

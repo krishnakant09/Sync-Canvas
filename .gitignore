@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment
+.env
+.env.local
+
+# Server storage & snapshots
+server/storage/snapshots/*.bin

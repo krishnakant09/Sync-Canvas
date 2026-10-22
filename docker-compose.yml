@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # SyncCanvas Real-Time Server & Web App
+  synccanvas:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: synccanvas-server
+    restart: unless-stopped
+    ports:
+      - "1234:1234"
+    environment:
+      - PORT=1234
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - SNAPSHOT_DIR=/app/server/storage/snapshots
+    volumes:
+      - canvas-snapshots:/app/server/storage/snapshots
+    depends_on:
+      - redis
+    networks:
+      - synccanvas-net
+
+  # Redis Cluster Broker for Horizontal WebSocket Scaling
+  redis:
+    image: redis:7-alpine
+    container_name: synccanvas-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - synccanvas-net
+
+volumes:
+  canvas-snapshots:
+  redis-data:
+
+networks:
+  synccanvas-net:
+    driver: bridge
