@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ZoomIn,
   ZoomOut,
@@ -10,11 +10,18 @@ import {
   Trash2,
   HelpCircle,
   Sparkles,
+  Share2,
+  Check,
+  Radio,
 } from 'lucide-react';
 import { Viewport } from '../types/canvas';
+import { ConnectionStatus } from '../hooks/useYjsRoom';
 
 interface CanvasHeaderProps {
   viewport: Viewport;
+  connectionStatus: ConnectionStatus;
+  roomName: string;
+  onChangeRoom: (newRoom: string) => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onResetZoom: () => void;
@@ -29,6 +36,9 @@ interface CanvasHeaderProps {
 
 export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
   viewport,
+  connectionStatus,
+  roomName,
+  onChangeRoom,
   onZoomIn,
   onZoomOut,
   onResetZoom,
@@ -41,6 +51,17 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
   totalElements,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [copied, setCopied] = useState(false);
+  const [isEditingRoom, setIsEditingRoom] = useState(false);
+  const [roomInput, setRoomInput] = useState(roomName);
+
+  const handleCopyLink = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', roomName);
+    navigator.clipboard.writeText(url.toString());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -57,6 +78,36 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  const handleRoomSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (roomInput.trim() && roomInput !== roomName) {
+      onChangeRoom(roomInput.trim());
+    }
+    setIsEditingRoom(false);
+  };
+
+  const getStatusColor = () => {
+    switch (connectionStatus) {
+      case 'connected':
+        return 'var(--accent-emerald)';
+      case 'connecting':
+        return 'var(--accent-amber)';
+      case 'disconnected':
+        return 'var(--accent-rose)';
+    }
+  };
+
+  const getStatusLabel = () => {
+    switch (connectionStatus) {
+      case 'connected':
+        return 'Multiplayer Live';
+      case 'connecting':
+        return 'Connecting...';
+      case 'disconnected':
+        return 'Offline';
+    }
   };
 
   return (
@@ -108,18 +159,62 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
           SyncCanvas
         </div>
 
+        {/* Room Switcher */}
+        {isEditingRoom ? (
+          <form onSubmit={handleRoomSubmit} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <input
+              autoFocus
+              value={roomInput}
+              onChange={(e) => setRoomInput(e.target.value)}
+              onBlur={() => setIsEditingRoom(false)}
+              style={{
+                height: '28px',
+                padding: '2px 8px',
+                fontSize: '12px',
+                fontFamily: 'var(--font-mono)',
+                width: '140px',
+              }}
+            />
+          </form>
+        ) : (
+          <button
+            onClick={() => {
+              setRoomInput(roomName);
+              setIsEditingRoom(true);
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '8px',
+              padding: '4px 10px',
+              fontSize: '12px',
+              fontWeight: 600,
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--text-main)',
+            }}
+            data-tooltip="Click to switch room"
+            data-tooltip-pos="bottom"
+          >
+            <span style={{ color: 'var(--primary)' }}>#</span> {roomName}
+          </button>
+        )}
+
+        {/* Live Multiplayer Status Badge */}
         <div
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            background: 'rgba(99, 102, 241, 0.15)',
-            border: '1px solid rgba(99, 102, 241, 0.3)',
+            background: 'rgba(99, 102, 241, 0.12)',
+            border: '1px solid rgba(99, 102, 241, 0.25)',
             borderRadius: '20px',
-            padding: '2px 10px',
+            padding: '3px 10px',
             fontSize: '11px',
             fontWeight: 600,
-            color: '#a5b4fc',
+            color: '#c7d2fe',
           }}
         >
           <span
@@ -127,12 +222,34 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
               width: '6px',
               height: '6px',
               borderRadius: '50%',
-              backgroundColor: 'var(--accent-emerald)',
-              boxShadow: '0 0 6px var(--accent-emerald)',
+              backgroundColor: getStatusColor(),
+              boxShadow: `0 0 8px ${getStatusColor()}`,
             }}
           />
-          Phase 1: Local Engine Ready ({totalElements} items)
+          {getStatusLabel()} ({totalElements} items)
         </div>
+
+        {/* Share / Copy Room Link Button */}
+        <button
+          className="icon-btn"
+          style={{
+            height: '28px',
+            padding: '0 8px',
+            width: 'auto',
+            gap: '6px',
+            fontSize: '11px',
+            fontWeight: 600,
+            background: copied ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+            color: copied ? 'var(--accent-emerald)' : 'var(--text-muted)',
+            border: '1px solid var(--border-subtle)',
+          }}
+          onClick={handleCopyLink}
+          data-tooltip="Copy invite link to collaborate in another tab"
+          data-tooltip-pos="bottom"
+        >
+          {copied ? <Check size={13} /> : <Share2 size={13} />}
+          {copied ? 'Copied Link!' : 'Share Room'}
+        </button>
       </div>
 
       {/* Center Viewport Zoom Controls */}

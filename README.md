@@ -66,30 +66,46 @@ SyncCanvas is a high-performance, real-time collaborative whiteboard and infinit
 
 ---
 
-## 🛠️ Tech Stack
+## ⚡ Phase 2: Completed Features (Real-Time Multiplayer Sync)
 
-- **Frontend:** React 19, TypeScript, Vite
-- **Icons:** Lucide React
-- **Typography:** Plus Jakarta Sans & JetBrains Mono
-- **CRDT Engine (Phase 2):** Yjs (`y-websocket`, `y-indexeddb`)
-- **Backend / Scaling (Phase 2 & 4):** Node.js / Go, WebSockets, Redis Pub/Sub, PostgreSQL
+- [x] **Standalone Real-Time WebSocket Server (`server/server.ts`):**
+  - Room multiplexing with binary sync protocol (SyncStep1, SyncStep2, Update).
+  - Awareness state relay (presence, cursors).
+  - Health & metrics REST API endpoint (`http://localhost:1234/stats`).
+  - Automatic connection cleanup and heartbeat ping/pong.
+- [x] **CRDT Room Hook (`useYjsRoom`):**
+  - Shared `Y.Doc` and `Y.Map<CanvasElement>`.
+  - Transactional mutations with `doc.transact(...)`.
+  - Distributed `Y.UndoManager` for multi-user undo/redo.
+- [x] **Dynamic Multi-Room Collaboration:**
+  - URL parameter room switching (`?room=team-alpha`).
+  - One-click `Share Room` link copy button in header.
+  - Live connection status badge (Connected, Connecting, Offline).
 
 ---
 
-## 💻 Getting Started Locally
+## 🛠️ Tech Stack
 
-### 1. Clone & Install
+- **Frontend:** React 19, TypeScript, Vite
+- **Real-Time & CRDT:** Yjs, `y-websocket`, `y-protocols`, `lib0`
+- **Backend Server:** Node.js, TypeScript, `ws`, `http`, `tsx`
+- **Icons & Styling:** Lucide React, Plus Jakarta Sans, JetBrains Mono
+
+---
+
+## 💻 Running Locally
+
+### 1. Start Real-Time WebSocket Server
 ```bash
-git clone <repo-url>
-cd sync-canvas
-npm install
+npm run server
 ```
+Server listens on port `1234` with metrics at `http://localhost:1234/stats`.
 
-### 2. Start Local Development Server
+### 2. Start Vite Frontend
 ```bash
 npm run dev
 ```
-Open **[http://127.0.0.1:5173](http://127.0.0.1:5173)** in your browser.
+Open **[http://127.0.0.1:5173](http://127.0.0.1:5173)** in two separate browser windows to test real-time collaboration!
 
 ---
 
@@ -119,6 +135,6 @@ Open **[http://127.0.0.1:5173](http://127.0.0.1:5173)** in your browser.
 ## 🗺️ Project Roadmap
 
 - **Phase 1 (Completed):** Interactive Canvas Engine, local state transformations, shape rendering, export tools.
-- **Phase 2 (Next):** WebSocket Gateway Server + Yjs `Y.Doc` binding for real-time document synchronization.
-- **Phase 3:** Multi-user live awareness (cursor tracking, user avatars, color coding) + IndexedDB offline sync.
+- **Phase 2 (Completed):** WebSocket Gateway Server + Yjs `Y.Doc` binding for real-time document synchronization.
+- **Phase 3 (Next):** Multi-user live awareness (cursor tracking with user names & colors, active element selection halos) + `y-indexeddb` offline sync.
 - **Phase 4:** Redis Pub/Sub horizontal scaling, PostgreSQL auth/rooms, and production deployment.

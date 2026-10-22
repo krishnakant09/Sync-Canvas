@@ -17,7 +17,7 @@ import {
   screenToWorld,
 } from './utils/math';
 import { exportToJSON, exportToPNG } from './utils/export';
-import { useCanvasHistory } from './hooks/useCanvasHistory';
+import { useYjsRoom } from './hooks/useYjsRoom';
 import { CanvasGrid } from './components/CanvasGrid';
 import { Toolbar } from './components/Toolbar';
 import { PropertiesPanel } from './components/PropertiesPanel';
@@ -25,28 +25,28 @@ import { CanvasHeader } from './components/CanvasHeader';
 import { CanvasRenderer } from './components/CanvasRenderer';
 import { ShortcutsModal } from './components/ShortcutsModal';
 
-// Initial welcoming architectural demo elements
+// Initial welcoming architectural demo elements for new rooms
 const INITIAL_ELEMENTS: CanvasElement[] = [
   {
     id: 'demo_sticky_1',
     type: 'sticky',
     x: 80,
     y: 80,
-    width: 220,
-    height: 180,
+    width: 240,
+    height: 190,
     fill: '#fef08a',
     stroke: 'transparent',
     strokeWidth: 1,
     opacity: 1,
     zIndex: 1,
-    text: '🚀 Welcome to SyncCanvas!\n\nPhase 1 Interactive Canvas Engine is ready.\n\nTry dragging, resizing, creating notes, or pressing "V" for select.',
+    text: '🚀 Welcome to SyncCanvas!\n\nPhase 2 Real-Time CRDT Synchronization is now LIVE!\n\nOpen this URL in another tab and watch changes sync in sub-30ms with zero merge conflicts.',
     fontSize: 15,
     updatedAt: Date.now(),
   },
   {
     id: 'demo_rect_1',
     type: 'rectangle',
-    x: 380,
+    x: 400,
     y: 90,
     width: 200,
     height: 110,
@@ -60,7 +60,7 @@ const INITIAL_ELEMENTS: CanvasElement[] = [
   {
     id: 'demo_text_1',
     type: 'text',
-    x: 405,
+    x: 425,
     y: 130,
     width: 150,
     height: 30,
@@ -69,7 +69,7 @@ const INITIAL_ELEMENTS: CanvasElement[] = [
     strokeWidth: 1,
     opacity: 1,
     zIndex: 3,
-    text: 'Frontend Engine\nSVG + React',
+    text: 'Frontend Engine\nSVG + React 19',
     fontSize: 16,
     textAlign: 'center',
     updatedAt: Date.now(),
@@ -77,7 +77,7 @@ const INITIAL_ELEMENTS: CanvasElement[] = [
   {
     id: 'demo_arrow_1',
     type: 'arrow',
-    x: 580,
+    x: 600,
     y: 145,
     width: 100,
     height: 0,
@@ -91,9 +91,9 @@ const INITIAL_ELEMENTS: CanvasElement[] = [
   {
     id: 'demo_rect_2',
     type: 'rectangle',
-    x: 680,
+    x: 700,
     y: 90,
-    width: 220,
+    width: 240,
     height: 110,
     fill: '#1e293b',
     stroke: '#22d3ee',
@@ -105,16 +105,16 @@ const INITIAL_ELEMENTS: CanvasElement[] = [
   {
     id: 'demo_text_2',
     type: 'text',
-    x: 705,
+    x: 720,
     y: 130,
-    width: 170,
+    width: 200,
     height: 30,
     fill: 'transparent',
     stroke: '#22d3ee',
     strokeWidth: 1,
     opacity: 1,
     zIndex: 3,
-    text: 'CRDT Architecture\nYjs State Vectors',
+    text: 'CRDT Gateway\nws://localhost:1234',
     fontSize: 16,
     textAlign: 'center',
     updatedAt: Date.now(),
@@ -122,16 +122,16 @@ const INITIAL_ELEMENTS: CanvasElement[] = [
   {
     id: 'demo_sticky_2',
     type: 'sticky',
-    x: 380,
-    y: 250,
-    width: 260,
-    height: 160,
+    x: 400,
+    y: 260,
+    width: 280,
+    height: 170,
     fill: '#e9d5ff',
     stroke: 'transparent',
     strokeWidth: 1,
     opacity: 1,
     zIndex: 1,
-    text: '💡 Next Up (Phase 2):\n\nWe connect the WebSocket gateway and bind each element to a Yjs Y.Map for real-time multiplayer editing!',
+    text: '⚡ Conflict-Free Replicated Data Types:\n\nAll board objects are stored in a Yjs Y.Map. Changes emit compact binary deltas broadcasted over WebSockets to every connected peer!',
     fontSize: 15,
     updatedAt: Date.now(),
   },
@@ -139,6 +139,32 @@ const INITIAL_ELEMENTS: CanvasElement[] = [
 
 export const App: React.FC = () => {
   const svgRef = useRef<SVGSVGElement>(null);
+
+  // Room name derived from URL query parameter (e.g. ?room=team-canvas)
+  const [roomName, setRoomName] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('room') || 'main-canvas';
+  });
+
+  // Real-Time Yjs Synchronization Hook
+  const {
+    elements,
+    status: connectionStatus,
+    setElement,
+    setElementsBatch,
+    deleteElementsBatch,
+    clearRoom,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useYjsRoom({
+    roomName,
+    initialElements: INITIAL_ELEMENTS,
+  });
+
+  // Local transient overrides for high-performance 60 FPS dragging before committing to Yjs
+  const [transientOverrides, setTransientOverrides] = useState<Map<string, Partial<CanvasElement>>>(new Map());
 
   // Viewport State (Pan & Zoom)
   const [viewport, setViewport] = useState<Viewport>({
@@ -154,56 +180,54 @@ export const App: React.FC = () => {
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
-  // Mouse Coordinates in World Space (for bottom status bar)
+  // Mouse Coordinates in World Space (for status bar)
   const [cursorPos, setCursorPos] = useState<Point>({ x: 0, y: 0 });
-
-  // History & Elements Management
-  const {
-    elements,
-    pushState,
-    setElementsTransient,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-    clearHistory,
-  } = useCanvasHistory(INITIAL_ELEMENTS);
 
   // In-flight drag state (create, move, resize, pan, box-select)
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [previewElement, setPreviewElement] = useState<CanvasElement | null>(null);
 
+  // Render elements with local transient dragging overrides applied
+  const renderedElements = elements.map((el) => {
+    const override = transientOverrides.get(el.id);
+    return override ? { ...el, ...override } : el;
+  });
+
   // Active selection bounding box
-  const selectedElements = elements.filter((el) => selectedIds.has(el.id));
+  const selectedElements = renderedElements.filter((el) => selectedIds.has(el.id));
   const selectionBounds = getSelectionBoundingBox(selectedElements);
+
+  // Switch Room handler
+  const handleRoomChange = (newRoom: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', newRoom);
+    window.history.pushState({}, '', url.toString());
+    setRoomName(newRoom);
+    setSelectedIds(new Set());
+  };
 
   // ==========================================
   // VIEWPORT ZOOM & PAN HELPERS
   // ==========================================
-  const handleZoom = useCallback(
-    (delta: number, focalPoint?: Point) => {
-      setViewport((prev) => {
-        const newZoom = Math.min(3, Math.max(0.15, prev.zoom * delta));
-        if (focalPoint) {
-          // Zoom centered around focal point (e.g. mouse cursor)
-          const newX = focalPoint.x - (focalPoint.x - prev.x) * (newZoom / prev.zoom);
-          const newY = focalPoint.y - (focalPoint.y - prev.y) * (newZoom / prev.zoom);
-          return { x: newX, y: newY, zoom: newZoom };
-        }
-        // Center of window zoom
-        const cx = window.innerWidth / 2;
-        const cy = window.innerHeight / 2;
-        const newX = cx - (cx - prev.x) * (newZoom / prev.zoom);
-        const newY = cy - (cy - prev.y) * (newZoom / prev.zoom);
+  const handleZoom = useCallback((delta: number, focalPoint?: Point) => {
+    setViewport((prev) => {
+      const newZoom = Math.min(3, Math.max(0.15, prev.zoom * delta));
+      if (focalPoint) {
+        const newX = focalPoint.x - (focalPoint.x - prev.x) * (newZoom / prev.zoom);
+        const newY = focalPoint.y - (focalPoint.y - prev.y) * (newZoom / prev.zoom);
         return { x: newX, y: newY, zoom: newZoom };
-      });
-    },
-    []
-  );
+      }
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const newX = cx - (cx - prev.x) * (newZoom / prev.zoom);
+      const newY = cy - (cy - prev.y) * (newZoom / prev.zoom);
+      return { x: newX, y: newY, zoom: newZoom };
+    });
+  }, []);
 
   const handleFitContent = useCallback(() => {
-    if (elements.length === 0) return;
-    const bounds = getSelectionBoundingBox(elements);
+    if (renderedElements.length === 0) return;
+    const bounds = getSelectionBoundingBox(renderedElements);
     if (!bounds) return;
 
     const padding = 100;
@@ -219,7 +243,7 @@ export const App: React.FC = () => {
     const y = window.innerHeight / 2 - (bounds.y + bounds.height / 2) * zoom;
 
     setViewport({ x, y, zoom });
-  }, [elements]);
+  }, [renderedElements]);
 
   // ==========================================
   // MOUSE WHEEL (PAN & ZOOM)
@@ -228,11 +252,9 @@ export const App: React.FC = () => {
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
-        // Pinch to zoom or Ctrl+Wheel
         const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
         handleZoom(zoomFactor, { x: e.clientX, y: e.clientY });
       } else {
-        // Normal wheel pan
         setViewport((prev) => ({
           ...prev,
           x: prev.x - e.deltaX,
@@ -249,16 +271,17 @@ export const App: React.FC = () => {
   // ELEMENT ACTIONS & SELECTION
   // ==========================================
   const handleUpdateElement = (id: string, updates: Partial<CanvasElement>) => {
-    const next = elements.map((el) => (el.id === id ? { ...el, ...updates, updatedAt: Date.now() } : el));
-    pushState(next);
+    const existing = elements.find((el) => el.id === id);
+    if (existing) {
+      setElement({ ...existing, ...updates });
+    }
   };
 
   const handleDeleteSelected = useCallback(() => {
     if (selectedIds.size === 0) return;
-    const next = elements.filter((el) => !selectedIds.has(el.id));
-    pushState(next);
+    deleteElementsBatch(Array.from(selectedIds));
     setSelectedIds(new Set());
-  }, [elements, pushState, selectedIds]);
+  }, [deleteElementsBatch, selectedIds]);
 
   const handleDuplicateSelected = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -279,29 +302,32 @@ export const App: React.FC = () => {
       }
     });
 
-    pushState([...elements, ...newElements]);
+    setElementsBatch(newElements);
     setSelectedIds(newSelectedIds);
-  }, [elements, pushState, selectedIds]);
+  }, [elements, selectedIds, setElementsBatch]);
 
   const handleBringToFront = () => {
     if (selectedIds.size === 0) return;
     const maxZ = Math.max(...elements.map((e) => e.zIndex), 0);
-    const next = elements.map((el) => (selectedIds.has(el.id) ? { ...el, zIndex: maxZ + 1 } : el));
-    pushState(next);
+    const toUpdate = elements
+      .filter((el) => selectedIds.has(el.id))
+      .map((el) => ({ ...el, zIndex: maxZ + 1 }));
+    setElementsBatch(toUpdate);
   };
 
   const handleSendToBack = () => {
     if (selectedIds.size === 0) return;
     const minZ = Math.min(...elements.map((e) => e.zIndex), 1);
-    const next = elements.map((el) => (selectedIds.has(el.id) ? { ...el, zIndex: Math.max(0, minZ - 1) } : el));
-    pushState(next);
+    const toUpdate = elements
+      .filter((el) => selectedIds.has(el.id))
+      .map((el) => ({ ...el, zIndex: Math.max(0, minZ - 1) }));
+    setElementsBatch(toUpdate);
   };
 
   // ==========================================
   // MOUSE & POINTER EVENTS ON CANVAS
   // ==========================================
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
-    // If middle click or space key is active, initiate Pan
     if (e.button === 1 || isSpacePressed || activeTool === 'hand') {
       setDragState({
         type: 'pan',
@@ -314,7 +340,7 @@ export const App: React.FC = () => {
       return;
     }
 
-    if (e.button !== 0) return; // Only process left click
+    if (e.button !== 0) return;
 
     const worldPoint = screenToWorld(e.clientX, e.clientY, viewport);
     const target = e.target as SVGElement;
@@ -339,9 +365,9 @@ export const App: React.FC = () => {
 
     // 2. Eraser Tool: Click to delete element
     if (activeTool === 'eraser') {
-      const hit = [...elements].reverse().find((el) => isPointInElement(worldPoint, el));
+      const hit = [...renderedElements].reverse().find((el) => isPointInElement(worldPoint, el));
       if (hit) {
-        pushState(elements.filter((el) => el.id !== hit.id));
+        deleteElementsBatch([hit.id]);
         setSelectedIds((prev) => {
           const next = new Set(prev);
           next.delete(hit.id);
@@ -353,7 +379,7 @@ export const App: React.FC = () => {
 
     // 3. Select Tool: Hit test elements
     if (activeTool === 'select') {
-      const hit = [...elements].reverse().find((el) => isPointInElement(worldPoint, el));
+      const hit = [...renderedElements].reverse().find((el) => isPointInElement(worldPoint, el));
 
       if (hit) {
         const nextSelected = new Set(selectedIds);
@@ -369,7 +395,7 @@ export const App: React.FC = () => {
         setSelectedIds(nextSelected);
 
         const initialMap = new Map<string, CanvasElement>();
-        elements.forEach((el) => {
+        renderedElements.forEach((el) => {
           if (nextSelected.has(el.id)) initialMap.set(el.id, { ...el });
         });
 
@@ -383,7 +409,6 @@ export const App: React.FC = () => {
           initialElements: initialMap,
         });
       } else {
-        // Clicked empty area -> start marquee selection box
         if (!e.shiftKey) setSelectedIds(new Set());
         setDragState({
           type: 'box-select',
@@ -396,7 +421,7 @@ export const App: React.FC = () => {
       return;
     }
 
-    // 4. Creation Tools: Rectangle, Circle, Sticky, Text, Arrow, Draw
+    // 4. Creation Tools
     const baseElementProps = {
       id: generateId(activeTool),
       x: worldPoint.x,
@@ -458,7 +483,6 @@ export const App: React.FC = () => {
         strokeWidth: 2,
       };
     } else {
-      // draw
       newEl = {
         ...baseElementProps,
         type: 'draw',
@@ -501,19 +525,14 @@ export const App: React.FC = () => {
       const deltaX = worldPoint.x - dragState.startX;
       const deltaY = worldPoint.y - dragState.startY;
 
-      setElementsTransient((prev) =>
-        prev.map((el) => {
-          const init = dragState.initialElements?.get(el.id);
-          if (init) {
-            return {
-              ...el,
-              x: init.x + deltaX,
-              y: init.y + deltaY,
-            };
-          }
-          return el;
-        })
-      );
+      const newOverrides = new Map<string, Partial<CanvasElement>>();
+      dragState.initialElements.forEach((init, id) => {
+        newOverrides.set(id, {
+          x: init.x + deltaX,
+          y: init.y + deltaY,
+        });
+      });
+      setTransientOverrides(newOverrides);
       return;
     }
 
@@ -521,16 +540,12 @@ export const App: React.FC = () => {
       const deltaX = worldPoint.x - dragState.startX;
       const deltaY = worldPoint.y - dragState.startY;
 
-      setElementsTransient((prev) =>
-        prev.map((el) => {
-          const init = dragState.initialElements?.get(el.id);
-          if (init) {
-            const resized = computeResize(init, dragState.resizeHandle!, deltaX, deltaY);
-            return { ...el, ...resized };
-          }
-          return el;
-        })
-      );
+      const newOverrides = new Map<string, Partial<CanvasElement>>();
+      dragState.initialElements.forEach((init, id) => {
+        const resized = computeResize(init, dragState.resizeHandle!, deltaX, deltaY);
+        newOverrides.set(id, resized);
+      });
+      setTransientOverrides(newOverrides);
       return;
     }
 
@@ -545,7 +560,7 @@ export const App: React.FC = () => {
       );
 
       const newlySelected = new Set<string>();
-      elements.forEach((el) => {
+      renderedElements.forEach((el) => {
         if (isElementInBox(el, box)) newlySelected.add(el.id);
       });
       setSelectedIds(newlySelected);
@@ -583,8 +598,18 @@ export const App: React.FC = () => {
     if (!dragState) return;
 
     if (dragState.type === 'move' || dragState.type === 'resize') {
-      // Commit transient movements into history stack
-      pushState([...elements]);
+      // Commit transient overrides into Yjs CRDT map
+      if (transientOverrides.size > 0) {
+        const elementsToUpdate: CanvasElement[] = [];
+        transientOverrides.forEach((override, id) => {
+          const original = elements.find((el) => el.id === id);
+          if (original) {
+            elementsToUpdate.push({ ...original, ...override });
+          }
+        });
+        setElementsBatch(elementsToUpdate);
+        setTransientOverrides(new Map());
+      }
     } else if (dragState.type === 'create' && previewElement) {
       let finalElement: CanvasElement = { ...previewElement };
 
@@ -595,17 +620,16 @@ export const App: React.FC = () => {
           finalElement.width,
           finalElement.height
         );
-        // Default size if user just single-clicked
         finalElement.x = norm.x;
         finalElement.y = norm.y;
         finalElement.width = Math.max(norm.width, finalElement.type === 'sticky' ? 180 : 120);
         finalElement.height = Math.max(norm.height, finalElement.type === 'sticky' ? 160 : 80);
       }
 
-      pushState([...elements, finalElement]);
+      setElement(finalElement);
       setSelectedIds(new Set([finalElement.id]));
       setPreviewElement(null);
-      setActiveTool('select'); // Automatically revert back to select tool
+      setActiveTool('select');
 
       if (finalElement.type === 'text' || finalElement.type === 'sticky') {
         setEditingId(finalElement.id);
@@ -620,7 +644,6 @@ export const App: React.FC = () => {
   // ==========================================
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is currently typing in an input/textarea
       const activeTag = document.activeElement?.tagName.toLowerCase();
       if (activeTag === 'input' || activeTag === 'textarea') return;
 
@@ -628,7 +651,7 @@ export const App: React.FC = () => {
         setIsSpacePressed(true);
       }
 
-      // Undo / Redo
+      // Undo / Redo (CRDT Distributed UndoManager)
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -713,29 +736,32 @@ export const App: React.FC = () => {
       {/* Dynamic Background Dot Grid */}
       <CanvasGrid viewport={viewport} />
 
-      {/* Top Navbar Header */}
+      {/* Top Navbar Header with Real-Time Multiplayer Room & Status */}
       <CanvasHeader
         viewport={viewport}
+        connectionStatus={connectionStatus}
+        roomName={roomName}
+        onChangeRoom={handleRoomChange}
         onZoomIn={() => handleZoom(1.2)}
         onZoomOut={() => handleZoom(0.8)}
         onResetZoom={() => setViewport((prev) => ({ ...prev, zoom: 1 }))}
         onFitContent={handleFitContent}
-        onExportPNG={() => exportToPNG(svgRef.current, elements)}
-        onExportJSON={() => exportToJSON(elements)}
+        onExportPNG={() => exportToPNG(svgRef.current, renderedElements)}
+        onExportJSON={() => exportToJSON(renderedElements)}
         onImportJSON={(imported) => {
           if (Array.isArray(imported)) {
-            pushState(imported);
+            setElementsBatch(imported);
             setSelectedIds(new Set());
           }
         }}
         onClearCanvas={() => {
-          if (window.confirm('Clear all items from canvas?')) {
-            clearHistory([]);
+          if (window.confirm('Clear all items from the shared room?')) {
+            clearRoom();
             setSelectedIds(new Set());
           }
         }}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
-        totalElements={elements.length}
+        totalElements={renderedElements.length}
       />
 
       {/* Selected Element Properties Inspector */}
@@ -758,7 +784,7 @@ export const App: React.FC = () => {
         <CanvasRenderer
           svgRef={svgRef}
           viewport={viewport}
-          elements={elements}
+          elements={renderedElements}
           selectedIds={selectedIds}
           dragState={dragState}
           selectionBounds={selectionBounds}
@@ -803,7 +829,9 @@ export const App: React.FC = () => {
         <span style={{ color: 'var(--border-subtle)' }}>|</span>
         <span>Zoom: {Math.round(viewport.zoom * 100)}%</span>
         <span style={{ color: 'var(--border-subtle)' }}>|</span>
-        <span style={{ color: 'var(--text-muted)' }}>Press ? for shortcuts</span>
+        <span style={{ color: connectionStatus === 'connected' ? 'var(--accent-emerald)' : 'var(--accent-amber)' }}>
+          ● {connectionStatus.toUpperCase()}
+        </span>
       </div>
 
       {/* Shortcuts Guide Modal */}
