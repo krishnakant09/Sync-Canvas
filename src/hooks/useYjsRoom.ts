@@ -127,6 +127,7 @@ export function useYjsRoom({
             cursor: state.cursor || null,
             selectedElementIds: state.selectedElementIds || [],
             lastActive: Date.now(),
+            cursorChat: state.cursorChat || null,
           });
         }
       });
@@ -170,6 +171,13 @@ export function useYjsRoom({
     const provider = providerRef.current;
     if (!provider) return;
     provider.awareness.setLocalStateField('user', profile);
+  }, []);
+
+  // Update cursor chat message in awareness
+  const updateCursorChat = useCallback((message: string | null) => {
+    const provider = providerRef.current;
+    if (!provider) return;
+    provider.awareness.setLocalStateField('cursorChat', message);
   }, []);
 
   // Set or update a single element in the CRDT map
@@ -239,6 +247,7 @@ export function useYjsRoom({
     updateCursor,
     updateSelectedElementIds,
     updateUserProfile,
+    updateCursorChat,
     setElement,
     setElementsBatch,
     deleteElement,

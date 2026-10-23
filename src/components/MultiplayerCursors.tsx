@@ -58,6 +58,61 @@ export const MultiplayerCursors: React.FC<MultiplayerCursorsProps> = ({ remoteUs
                 {name}
               </text>
             </g>
+
+            {/* Real-Time Figma-Style Cursor Chat Speech Bubble */}
+            {peer.cursorChat && peer.cursorChat.trim().length > 0 && (
+              <g transform="translate(14, 44)">
+                {/* Connecting Speech Tail pointing up to cursor badge */}
+                <path
+                  d="M 6 0 L 10 -5 L 14 0 Z"
+                  fill="rgba(15, 23, 42, 0.96)"
+                  stroke={color}
+                  strokeWidth="1"
+                />
+
+                <foreignObject
+                  x="0"
+                  y="0"
+                  width="280"
+                  height="160"
+                  style={{ overflow: 'visible', pointerEvents: 'none' }}
+                >
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 14px',
+                      background: 'rgba(15, 23, 42, 0.96)',
+                      backdropFilter: 'blur(12px)',
+                      border: `1.5px solid ${color}`,
+                      borderRadius: '16px',
+                      borderTopLeftRadius: '3px',
+                      color: '#ffffff',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      fontFamily: 'var(--font-sans)',
+                      boxShadow: `0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px ${color}40`,
+                      maxWidth: '260px',
+                      wordBreak: 'break-word',
+                      lineHeight: '1.4',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        backgroundColor: color,
+                        flexShrink: 0,
+                        boxShadow: `0 0 8px ${color}`,
+                      }}
+                    />
+                    <span>{peer.cursorChat}</span>
+                  </div>
+                </foreignObject>
+              </g>
+            )}
           </g>
         );
       })}

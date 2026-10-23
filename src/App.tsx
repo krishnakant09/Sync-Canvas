@@ -28,6 +28,7 @@ import { CanvasHeader } from './components/CanvasHeader';
 import { CanvasRenderer } from './components/CanvasRenderer';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { CursorChat } from './components/CursorChat';
 
 // Initial welcoming architectural demo elements for new rooms
 const INITIAL_ELEMENTS: CanvasElement[] = [
@@ -163,6 +164,7 @@ export const App: React.FC = () => {
     updateCursor,
     updateSelectedElementIds,
     updateUserProfile,
+    updateCursorChat,
     setElement,
     setElementsBatch,
     deleteElementsBatch,
@@ -191,7 +193,23 @@ export const App: React.FC = () => {
   const [activeTool, setActiveTool] = useState<ToolType>('select');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isPropertiesDrawerOpen, setIsPropertiesDrawerOpen] = useState(false);
+  const [isCursorChatActive, setIsCursorChatActive] = useState(false);
+  const isCursorChatActiveRef = useRef(isCursorChatActive);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const editingIdRef = useRef(editingId);
+
+  useEffect(() => {
+    isCursorChatActiveRef.current = isCursorChatActive;
+  }, [isCursorChatActive]);
+
+  useEffect(() => {
+    editingIdRef.current = editingId;
+  }, [editingId]);
+
+  const [mouseScreenPos, setMouseScreenPos] = useState<Point>({
+    x: typeof window !== 'undefined' ? window.innerWidth / 2 : 400,
+    y: typeof window !== 'undefined' ? window.innerHeight / 2 : 300,
+  });
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
@@ -563,6 +581,7 @@ export const App: React.FC = () => {
   };
 
   const handlePointerMove = (clientX: number, clientY: number) => {
+    setMouseScreenPos({ x: clientX, y: clientY });
     const worldPoint = screenToWorld(clientX, clientY, viewport);
     setCursorPos(worldPoint);
     updateCursor(worldPoint);
@@ -810,6 +829,13 @@ export const App: React.FC = () => {
       const activeTag = document.activeElement?.tagName.toLowerCase();
       if (activeTag === 'input' || activeTag === 'textarea') return;
 
+      // Figma-Style Live Cursor Chat Trigger
+      if (e.key === '/' && !editingIdRef.current) {
+        e.preventDefault();
+        setIsCursorChatActive(true);
+        return;
+      }
+
       if (e.code === 'Space') {
         setIsSpacePressed(true);
       }
@@ -874,6 +900,11 @@ export const App: React.FC = () => {
           setIsShortcutsOpen((prev) => !prev);
           break;
         case 'escape':
+          if (isCursorChatActiveRef.current) {
+            setIsCursorChatActive(false);
+            updateCursorChat(null);
+            return;
+          }
           setIsPropertiesDrawerOpen(false);
           setSelectedIds(new Set());
           setEditingId(null);
@@ -891,7 +922,7 @@ export const App: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [handleDeleteSelected, handleDuplicateSelected, redo, undo]);
+  }, [handleDeleteSelected, handleDuplicateSelected, redo, undo, updateCursorChat]);
 
   return (
     <div
@@ -1041,6 +1072,18 @@ export const App: React.FC = () => {
         isPropertiesOpen={isPropertiesDrawerOpen}
         onToggleProperties={() => setIsPropertiesDrawerOpen((prev) => !prev)}
         hasSelection={selectedElements.length > 0}
+        isCursorChatActive={isCursorChatActive}
+        onToggleCursorChat={() => setIsCursorChatActive((prev) => !prev)}
+      />
+
+      {/* Figma-Style Interactive Cursor Chat Component */}
+      <CursorChat
+        isActive={isCursorChatActive}
+        onClose={() => setIsCursorChatActive(false)}
+        userProfile={userProfile}
+        mouseScreenPos={mouseScreenPos}
+        onBroadcastChat={updateCursorChat}
+        isMobile={isMobile}
       />
 
       {/* Bottom Status Bar */}

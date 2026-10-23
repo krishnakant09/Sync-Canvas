@@ -25,6 +25,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
     { key: 'Del / Backspace', desc: 'Delete Selected' },
     { key: 'Ctrl + Scroll', desc: 'Zoom In / Out' },
     { key: 'Shift + Click', desc: 'Multi-select Elements' },
+    { key: '/', desc: 'Cursor Chat (Live Talk)' },
     { key: 'Esc', desc: 'Cancel / Deselect' },
   ];
 

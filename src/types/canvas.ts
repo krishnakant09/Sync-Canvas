@@ -92,4 +92,5 @@ export interface UserPresence {
   cursor?: Point | null;
   selectedElementIds?: string[];
   lastActive?: number;
+  cursorChat?: string | null;
 }

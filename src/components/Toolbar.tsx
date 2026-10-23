@@ -12,6 +12,7 @@ import {
   Undo2,
   Redo2,
   Sliders,
+  MessageSquare,
 } from 'lucide-react';
 import type { ToolType } from '../types/canvas';
 
@@ -25,6 +26,8 @@ interface ToolbarProps {
   isPropertiesOpen?: boolean;
   onToggleProperties?: () => void;
   hasSelection?: boolean;
+  isCursorChatActive?: boolean;
+  onToggleCursorChat?: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -37,6 +40,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   isPropertiesOpen = false,
   onToggleProperties,
   hasSelection = false,
+  isCursorChatActive = false,
+  onToggleCursorChat,
 }) => {
   const tools: Array<{ id: ToolType; label: string; icon: React.ReactNode; shortcut: string }> = [
     { id: 'select', label: 'Select (V)', icon: <MousePointer size={18} />, shortcut: 'V' },
@@ -149,6 +154,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             )}
           </button>
         </>
+      )}
+
+      {onToggleCursorChat && (
+        <button
+          className={`icon-btn ${isCursorChatActive ? 'active' : ''}`}
+          onClick={onToggleCursorChat}
+          data-tooltip="Cursor Chat (/)"
+          aria-label="Cursor Chat (/ to talk)"
+          style={{ position: 'relative', flexShrink: 0 }}
+        >
+          <MessageSquare size={18} />
+        </button>
       )}
     </div>
   );
