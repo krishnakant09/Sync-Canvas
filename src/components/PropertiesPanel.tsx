@@ -9,6 +9,7 @@ import {
   AlignRight,
   Sliders,
   X,
+  RotateCcw,
 } from 'lucide-react';
 import type { CanvasElement } from '../types/canvas';
 
@@ -73,6 +74,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const isMulti = selectedElements.length > 1;
   const isSticky = hasSelection && firstElem.type === 'sticky';
   const hasText = hasSelection && (firstElem.type === 'text' || firstElem.type === 'sticky');
+  const isImage = hasSelection && firstElem.type === 'image';
 
   const handleUpdate = (updates: Partial<CanvasElement>) => {
     selectedElements.forEach((el) => {
@@ -226,7 +228,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               </div>
             </div>
           ) : (
-            firstElem.type !== 'draw' && firstElem.type !== 'arrow' && firstElem.type !== 'text' && (
+            firstElem.type !== 'draw' && firstElem.type !== 'arrow' && firstElem.type !== 'text' && !isImage && (
               <div>
                 <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
                   Fill Color
@@ -254,11 +256,32 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             )
           )}
 
+          {/* Image Dimensions & Reset */}
+          {isImage && (
+            <div style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Image Dimensions</span>
+                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
+                  {Math.round(firstElem.width)} × {Math.round(firstElem.height)}
+                </span>
+              </div>
+              {Boolean(firstElem.naturalWidth && firstElem.naturalHeight) && (
+                <button
+                  className="icon-btn"
+                  style={{ width: '100%', height: '28px', fontSize: '11px', gap: '6px' }}
+                  onClick={() => handleUpdate({ width: firstElem.naturalWidth, height: firstElem.naturalHeight })}
+                >
+                  <RotateCcw size={12} /> Reset to Original Size
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Stroke Color */}
           {!isSticky && (
             <div>
               <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                {firstElem.type === 'text' ? 'Text Color' : 'Stroke Color'}
+                {firstElem.type === 'text' ? 'Text Color' : isImage ? 'Border Color' : 'Stroke Color'}
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
                 {STROKE_PALETTE.map((c) => (
@@ -283,7 +306,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           {firstElem.type !== 'sticky' && firstElem.type !== 'text' && (
             <div>
               <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                Stroke Width
+                {isImage ? 'Border Width' : 'Stroke Width'}
               </label>
               <div style={{ display: 'flex', gap: '6px' }}>
                 {[1, 2, 4, 8].map((w) => (

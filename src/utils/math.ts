@@ -104,11 +104,18 @@ export function computeResize(
 ): { x: number; y: number; width: number; height: number } {
   let { x, y, width, height } = initial;
   const minSize = 20;
+  const isImage = initial.type === 'image';
+  const aspect = initial.width / Math.max(1, initial.height);
 
   switch (handle) {
     case 'se': {
-      width = Math.max(minSize, initial.width + deltaX);
-      height = Math.max(minSize, initial.height + deltaY);
+      if (isImage) {
+        width = Math.max(minSize, initial.width + deltaX);
+        height = Math.max(minSize, Math.round(width / aspect));
+      } else {
+        width = Math.max(minSize, initial.width + deltaX);
+        height = Math.max(minSize, initial.height + deltaY);
+      }
       break;
     }
     case 'e': {
@@ -120,15 +127,24 @@ export function computeResize(
       break;
     }
     case 'nw': {
-      const newWidth = initial.width - deltaX;
-      const newHeight = initial.height - deltaY;
-      if (newWidth >= minSize) {
+      if (isImage) {
+        const newWidth = Math.max(minSize, initial.width - deltaX);
+        const newHeight = Math.max(minSize, Math.round(newWidth / aspect));
+        x = initial.x + (initial.width - newWidth);
+        y = initial.y + (initial.height - newHeight);
         width = newWidth;
-        x = initial.x + deltaX;
-      }
-      if (newHeight >= minSize) {
         height = newHeight;
-        y = initial.y + deltaY;
+      } else {
+        const newWidth = initial.width - deltaX;
+        const newHeight = initial.height - deltaY;
+        if (newWidth >= minSize) {
+          width = newWidth;
+          x = initial.x + deltaX;
+        }
+        if (newHeight >= minSize) {
+          height = newHeight;
+          y = initial.y + deltaY;
+        }
       }
       break;
     }
@@ -149,20 +165,36 @@ export function computeResize(
       break;
     }
     case 'ne': {
-      const newHeight = initial.height - deltaY;
-      width = Math.max(minSize, initial.width + deltaX);
-      if (newHeight >= minSize) {
+      if (isImage) {
+        const newWidth = Math.max(minSize, initial.width + deltaX);
+        const newHeight = Math.max(minSize, Math.round(newWidth / aspect));
+        y = initial.y + (initial.height - newHeight);
+        width = newWidth;
         height = newHeight;
-        y = initial.y + deltaY;
+      } else {
+        const newHeight = initial.height - deltaY;
+        width = Math.max(minSize, initial.width + deltaX);
+        if (newHeight >= minSize) {
+          height = newHeight;
+          y = initial.y + deltaY;
+        }
       }
       break;
     }
     case 'sw': {
-      const newWidth = initial.width - deltaX;
-      height = Math.max(minSize, initial.height + deltaY);
-      if (newWidth >= minSize) {
+      if (isImage) {
+        const newWidth = Math.max(minSize, initial.width - deltaX);
+        const newHeight = Math.max(minSize, Math.round(newWidth / aspect));
+        x = initial.x + (initial.width - newWidth);
         width = newWidth;
-        x = initial.x + deltaX;
+        height = newHeight;
+      } else {
+        const newWidth = initial.width - deltaX;
+        height = Math.max(minSize, initial.height + deltaY);
+        if (newWidth >= minSize) {
+          width = newWidth;
+          x = initial.x + deltaX;
+        }
       }
       break;
     }

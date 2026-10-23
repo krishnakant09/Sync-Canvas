@@ -13,6 +13,7 @@ import {
   Redo2,
   Sliders,
   MessageSquare,
+  Image as ImageIcon,
 } from 'lucide-react';
 import type { ToolType } from '../types/canvas';
 
@@ -28,6 +29,7 @@ interface ToolbarProps {
   hasSelection?: boolean;
   isCursorChatActive?: boolean;
   onToggleCursorChat?: () => void;
+  onUploadImage?: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -42,6 +44,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   hasSelection = false,
   isCursorChatActive = false,
   onToggleCursorChat,
+  onUploadImage,
 }) => {
   const tools: Array<{ id: ToolType; label: string; icon: React.ReactNode; shortcut: string }> = [
     { id: 'select', label: 'Select (V)', icon: <MousePointer size={18} />, shortcut: 'V' },
@@ -50,6 +53,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     { id: 'circle', label: 'Circle (O)', icon: <Circle size={18} />, shortcut: 'O' },
     { id: 'sticky', label: 'Sticky Note (S)', icon: <StickyNote size={18} />, shortcut: 'S' },
     { id: 'text', label: 'Text (T)', icon: <Type size={18} />, shortcut: 'T' },
+    { id: 'image', label: 'Image (Upload / Ctrl+V)', icon: <ImageIcon size={18} />, shortcut: 'I' },
     { id: 'arrow', label: 'Arrow (A)', icon: <MoveRight size={18} />, shortcut: 'A' },
     { id: 'draw', label: 'Freehand Pen (P)', icon: <Pencil size={18} />, shortcut: 'P' },
     { id: 'eraser', label: 'Eraser (E)', icon: <Eraser size={18} />, shortcut: 'E' },
@@ -82,7 +86,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           key={t.id}
           className={`icon-btn ${activeTool === t.id ? 'active' : ''}`}
           style={{ flexShrink: 0 }}
-          onClick={() => setActiveTool(t.id)}
+          onClick={() => {
+            if (t.id === 'image' && onUploadImage) {
+              onUploadImage();
+            } else {
+              setActiveTool(t.id);
+            }
+          }}
           data-tooltip={t.label}
           aria-label={t.label}
         >

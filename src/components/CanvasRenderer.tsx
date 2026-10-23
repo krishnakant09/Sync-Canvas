@@ -237,6 +237,48 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
         );
       }
 
+      case 'image':
+        return (
+          <g key={el.id} opacity={el.opacity} style={{ pointerEvents: isPreview ? 'none' : 'auto' }}>
+            {el.src ? (
+              <image
+                href={el.src}
+                x={x}
+                y={y}
+                width={width}
+                height={height}
+                preserveAspectRatio="none"
+                style={{
+                  userSelect: 'none',
+                  pointerEvents: 'none',
+                }}
+              />
+            ) : (
+              <rect
+                x={x}
+                y={y}
+                width={width}
+                height={height}
+                fill="#1e293b"
+                stroke="var(--border-subtle)"
+              />
+            )}
+            {el.stroke && el.stroke !== 'transparent' && (
+              <rect
+                x={x}
+                y={y}
+                width={width}
+                height={height}
+                fill="none"
+                stroke={el.stroke}
+                strokeWidth={el.strokeWidth || 1}
+                strokeDasharray={el.strokeStyle === 'dashed' ? '6,6' : undefined}
+                pointerEvents="none"
+              />
+            )}
+          </g>
+        );
+
       case 'draw':
         return (
           <path

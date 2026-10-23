@@ -19,7 +19,8 @@ import {
 } from './utils/math';
 import { exportToJSON, exportToPNG } from './utils/export';
 import { getStoredUserProfile } from './utils/user';
-import { Sliders } from 'lucide-react';
+import { Sliders, Upload } from 'lucide-react';
+import { processImageFile } from './utils/image';
 import { useYjsRoom } from './hooks/useYjsRoom';
 import { CanvasGrid } from './components/CanvasGrid';
 import { Toolbar } from './components/Toolbar';
@@ -213,8 +214,19 @@ export const App: React.FC = () => {
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
-  // Mouse Coordinates in World Space (for status bar)
+  // Viewport Ref for stable access inside event listeners without re-subscription
+  const viewportRef = useRef(viewport);
+  useEffect(() => {
+    viewportRef.current = viewport;
+  }, [viewport]);
+
+  // Mouse Coordinates in World Space (for status bar & paste positioning)
   const [cursorPos, setCursorPos] = useState<Point>({ x: 0, y: 0 });
+  const mouseWorldPosRef = useRef<Point>({ x: 0, y: 0 });
+
+  // Image Drag-and-Drop & File Upload
+  const [isDragOver, setIsDragOver] = useState(false);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
 
   // In-flight drag state (create, move, resize, pan, box-select)
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -395,6 +407,136 @@ export const App: React.FC = () => {
   };
 
   // ==========================================
+  // IMAGE UPLOAD, PASTE & DRAG-AND-DROP
+  // ==========================================
+  const insertImageFile = useCallback(
+    async (file: File | Blob, targetPoint?: Point) => {
+      try {
+        const { src, naturalWidth, naturalHeight } = await processImageFile(file);
+
+        // Limit initial display dimensions to 480px while preserving original aspect ratio
+        const maxDisplaySize = 480;
+        const scale = Math.min(1, maxDisplaySize / Math.max(naturalWidth, naturalHeight));
+        const width = Math.round(naturalWidth * scale);
+        const height = Math.round(naturalHeight * scale);
+
+        let posX: number;
+        let posY: number;
+        if (targetPoint) {
+          posX = Math.round(targetPoint.x - width / 2);
+          posY = Math.round(targetPoint.y - height / 2);
+        } else {
+          const currentViewport = viewportRef.current;
+          const cx = (window.innerWidth / 2 - currentViewport.x) / currentViewport.zoom;
+          const cy = (window.innerHeight / 2 - currentViewport.y) / currentViewport.zoom;
+          posX = Math.round(cx - width / 2);
+          posY = Math.round(cy - height / 2);
+        }
+
+        const maxZ = elements.reduce((acc, el) => Math.max(acc, el.zIndex), 0);
+        const newEl: CanvasElement = {
+          id: generateId('image'),
+          type: 'image',
+          x: posX,
+          y: posY,
+          width,
+          height,
+          fill: 'transparent',
+          stroke: 'transparent',
+          strokeWidth: 0,
+          opacity: 1,
+          zIndex: maxZ + 1,
+          src,
+          naturalWidth,
+          naturalHeight,
+          updatedAt: Date.now(),
+        };
+
+        setElement(newEl);
+        setSelectedIds(new Set([newEl.id]));
+        setActiveTool('select');
+      } catch (err) {
+        console.error('Failed to process image file:', err);
+      }
+    },
+    [elements, setElement]
+  );
+
+  const handleImageFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      insertImageFile(file);
+    }
+    e.target.value = '';
+  };
+
+  // Global Clipboard Paste (Ctrl+V / Cmd+V) for image data
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea') return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            const hasCursor = mouseWorldPosRef.current.x !== 0 || mouseWorldPosRef.current.y !== 0;
+            const target = hasCursor ? { ...mouseWorldPosRef.current } : undefined;
+            insertImageFile(file, target);
+          }
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [insertImageFile]);
+
+  // Drag and Drop Handlers for canvas container
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (Array.from(e.dataTransfer.types).includes('Files')) {
+      e.dataTransfer.dropEffect = 'copy';
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const dropWorldPos = screenToWorld(e.clientX, e.clientY, viewportRef.current);
+      let count = 0;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.type.startsWith('image/')) {
+          const offset = count * 24;
+          insertImageFile(file, { x: dropWorldPos.x + offset, y: dropWorldPos.y + offset });
+          count++;
+        }
+      }
+    }
+  };
+
+  // ==========================================
   // UNIFIED POINTER & TOUCH GESTURE HANDLERS
   // ==========================================
   const handlePointerDown = (
@@ -450,6 +592,13 @@ export const App: React.FC = () => {
           return next;
         });
       }
+      return;
+    }
+
+    // Image Tool: Click canvas to open file picker
+    if (activeTool === 'image') {
+      imageFileInputRef.current?.click();
+      setActiveTool('select');
       return;
     }
 
@@ -583,6 +732,7 @@ export const App: React.FC = () => {
   const handlePointerMove = (clientX: number, clientY: number) => {
     setMouseScreenPos({ x: clientX, y: clientY });
     const worldPoint = screenToWorld(clientX, clientY, viewport);
+    mouseWorldPosRef.current = worldPoint;
     setCursorPos(worldPoint);
     updateCursor(worldPoint);
 
@@ -896,6 +1046,9 @@ export const App: React.FC = () => {
         case 'e':
           setActiveTool('eraser');
           break;
+        case 'i':
+          imageFileInputRef.current?.click();
+          break;
         case '?':
           setIsShortcutsOpen((prev) => !prev);
           break;
@@ -927,7 +1080,63 @@ export const App: React.FC = () => {
   return (
     <div
       className={`canvas-container cursor-${isSpacePressed ? (dragState?.type === 'pan' ? 'hand panning' : 'hand') : activeTool}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
+      {/* Hidden file input for Image upload tool */}
+      <input
+        ref={imageFileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleImageFileInput}
+      />
+
+      {/* Visual cue when dragging image files over canvas */}
+      {isDragOver && (
+        <div
+          className="animate-fade-in"
+          style={{
+            position: 'absolute',
+            inset: isMobile ? '12px' : '20px',
+            borderRadius: '16px',
+            border: '2px dashed var(--primary)',
+            background: 'rgba(99, 102, 241, 0.12)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px',
+            zIndex: 90,
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'rgba(99, 102, 241, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--primary)',
+              boxShadow: '0 0 24px var(--primary-glow)',
+            }}
+          >
+            <Upload size={32} />
+          </div>
+          <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)' }}>
+            Drop image to add to canvas
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            PNG, JPG, WebP, GIF, or SVG automatically compressed & synced
+          </div>
+        </div>
+      )}
+
       {/* Dynamic Background Dot Grid */}
       <CanvasGrid viewport={viewport} />
 
@@ -1074,6 +1283,7 @@ export const App: React.FC = () => {
         hasSelection={selectedElements.length > 0}
         isCursorChatActive={isCursorChatActive}
         onToggleCursorChat={() => setIsCursorChatActive((prev) => !prev)}
+        onUploadImage={() => imageFileInputRef.current?.click()}
       />
 
       {/* Figma-Style Interactive Cursor Chat Component */}

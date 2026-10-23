@@ -7,7 +7,8 @@ export type ToolType =
   | 'text'
   | 'arrow'
   | 'draw'
-  | 'eraser';
+  | 'eraser'
+  | 'image';
 
 export interface Point {
   x: number;
@@ -26,7 +27,8 @@ export type ElementType =
   | 'sticky'
   | 'text'
   | 'arrow'
-  | 'draw';
+  | 'draw'
+  | 'image';
 
 export interface CanvasElement {
   id: string;
@@ -42,6 +44,11 @@ export interface CanvasElement {
   strokeStyle?: 'solid' | 'dashed';
   opacity: number;
   zIndex: number;
+  
+  // Image metadata
+  src?: string;
+  naturalWidth?: number;
+  naturalHeight?: number;
   
   // Text & Sticky notes
   text?: string;
