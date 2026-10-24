@@ -1284,6 +1284,7 @@ export const App: React.FC = () => {
         isCursorChatActive={isCursorChatActive}
         onToggleCursorChat={() => setIsCursorChatActive((prev) => !prev)}
         onUploadImage={() => imageFileInputRef.current?.click()}
+        isMobile={isMobile}
       />
 
       {/* Figma-Style Interactive Cursor Chat Component */}
@@ -1296,12 +1297,13 @@ export const App: React.FC = () => {
         isMobile={isMobile}
       />
 
-      {/* Bottom Status Bar */}
+      {/* Status Bar */}
       <div
         className="glass-panel"
         style={{
-          position: 'absolute',
-          bottom: isMobile ? '70px' : '16px',
+          position: 'fixed',
+          top: isMobile ? 'max(56px, calc(env(safe-area-inset-top, 0px) + 54px))' : 'auto',
+          bottom: isMobile ? 'auto' : '16px',
           right: isMobile ? '12px' : '24px',
           padding: isMobile ? '3px 8px' : '4px 12px',
           display: 'flex',
@@ -1312,6 +1314,7 @@ export const App: React.FC = () => {
           color: 'var(--text-dim)',
           zIndex: 35,
           pointerEvents: 'none',
+          borderRadius: '20px',
         }}
       >
         {!isMobile && (
