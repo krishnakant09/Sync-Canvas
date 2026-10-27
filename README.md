@@ -60,6 +60,8 @@ SyncCanvas is an enterprise-grade, real-time collaborative infinite whiteboard i
 ### 3. Binary Awareness & Multiplayer Presence
 * Live mouse cursor positions $(x, y)$ broadcasted through the binary Yjs Awareness protocol.
 * Directional SVG cursor pointers with unique color themes and collaborator name tags.
+* **Cursor Reactions & Emoji Bursts:** Radial reaction wheel (`X` or toolbar) that fires floating particle fountain bursts with physics (`❤️`, `🔥`, `🎉`, `👍`, `🚀`, etc.) synced across collaborators in real time.
+* **Cursor Chat (Live Talk):** Ephemeral `/` floating speech bubbles right on your cursor pointer.
 * **Remote Selection Halos:** Highlights objects currently selected by other collaborators with colored dashed borders and editor name tags (Figma-style).
 * Active collaborators avatar stack in the top navbar with online count and user profile customization.
 
@@ -172,6 +174,9 @@ The real-time gateway exposes built-in observability endpoints:
 | `Del` / `Backspace` | Delete Selected |
 | `Ctrl + Scroll` | Zoom In / Out |
 | `Shift + Click` | Multi-select Elements |
+| `/` | Cursor Chat (Live Talk) |
+| `X` or `:` | Cursor Reactions (Emoji Picker) |
+| `1` - `8` | Quick Emoji Reaction Burst |
 | `?` | Keyboard Shortcuts Modal |
 
 ---

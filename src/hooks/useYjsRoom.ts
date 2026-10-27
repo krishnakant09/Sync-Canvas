@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { IndexeddbPersistence } from 'y-indexeddb';
-import type { CanvasElement, Point, UserPresence, UserProfile } from '../types/canvas';
+import type { CanvasElement, Point, ReactionEvent, UserPresence, UserProfile } from '../types/canvas';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
@@ -128,6 +128,7 @@ export function useYjsRoom({
             selectedElementIds: state.selectedElementIds || [],
             lastActive: Date.now(),
             cursorChat: state.cursorChat || null,
+            reaction: state.reaction || null,
           });
         }
       });
@@ -178,6 +179,18 @@ export function useYjsRoom({
     const provider = providerRef.current;
     if (!provider) return;
     provider.awareness.setLocalStateField('cursorChat', message);
+  }, []);
+
+  // Broadcast reaction event in awareness
+  const broadcastReaction = useCallback((emoji: string) => {
+    const provider = providerRef.current;
+    if (!provider) return;
+    const reaction: ReactionEvent = {
+      emoji,
+      id: `${docRef.current?.clientID || 0}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: Date.now(),
+    };
+    provider.awareness.setLocalStateField('reaction', reaction);
   }, []);
 
   // Set or update a single element in the CRDT map
@@ -248,6 +261,7 @@ export function useYjsRoom({
     updateSelectedElementIds,
     updateUserProfile,
     updateCursorChat,
+    broadcastReaction,
     setElement,
     setElementsBatch,
     deleteElement,

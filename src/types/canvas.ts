@@ -93,6 +93,12 @@ export interface UserProfile {
   color: string;
 }
 
+export interface ReactionEvent {
+  emoji: string;
+  id: string;
+  timestamp: number;
+}
+
 export interface UserPresence {
   clientId: number;
   user: UserProfile;
@@ -100,4 +106,5 @@ export interface UserPresence {
   selectedElementIds?: string[];
   lastActive?: number;
   cursorChat?: string | null;
+  reaction?: ReactionEvent | null;
 }

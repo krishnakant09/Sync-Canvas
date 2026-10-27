@@ -28,6 +28,8 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
     { key: 'Ctrl + Scroll', desc: 'Zoom In / Out' },
     { key: 'Shift + Click', desc: 'Multi-select Elements' },
     { key: '/', desc: 'Cursor Chat (Live Talk)' },
+    { key: 'X / :', desc: 'Cursor Reactions (Emoji Wheel)' },
+    { key: '1 - 8', desc: 'Trigger Quick Reaction Emoji' },
     { key: 'Esc', desc: 'Cancel / Deselect' },
   ];
 

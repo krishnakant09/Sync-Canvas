@@ -14,6 +14,7 @@ import {
   Redo2,
   Sliders,
   MessageSquare,
+  Smile,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -31,6 +32,8 @@ interface ToolbarProps {
   hasSelection?: boolean;
   isCursorChatActive?: boolean;
   onToggleCursorChat?: () => void;
+  isReactionPickerOpen?: boolean;
+  onToggleReactionPicker?: () => void;
   onUploadImage?: () => void;
   isMobile?: boolean;
 }
@@ -47,6 +50,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   hasSelection = false,
   isCursorChatActive = false,
   onToggleCursorChat,
+  isReactionPickerOpen = false,
+  onToggleReactionPicker,
   onUploadImage,
   isMobile = false,
 }) => {
@@ -291,6 +296,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             }}
           >
             <MessageSquare size={iconSize} />
+          </button>
+        )}
+
+        {onToggleReactionPicker && (
+          <button
+            className={`icon-btn ${isReactionPickerOpen ? 'active' : ''}`}
+            onClick={onToggleReactionPicker}
+            data-tooltip="Reactions (X)"
+            data-reaction-toggle="true"
+            aria-label="Cursor Reactions (X to react)"
+            style={{
+              position: 'relative',
+              flexShrink: 0,
+              width: btnSize,
+              height: btnSize,
+            }}
+          >
+            <Smile size={iconSize} />
           </button>
         )}
       </div>

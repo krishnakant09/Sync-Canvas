@@ -279,3 +279,53 @@ input:focus, textarea:focus, select:focus {
 .cursor-chat-bubble {
   animation: popIn 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Emoji Burst Particle Animation */
+@keyframes emojiBurstFloat {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.4) rotate(0deg);
+  }
+  15% {
+    opacity: 1;
+    transform: translate3d(calc(var(--drift-x) * 0.25), calc(var(--drift-y) * 0.3), 0) scale(var(--target-scale, 1.2)) rotate(calc(var(--rot) * 0.5));
+  }
+  75% {
+    opacity: 0.95;
+    transform: translate3d(calc(var(--drift-x) * 0.8), calc(var(--drift-y) * 0.8), 0) scale(1) rotate(var(--rot));
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift-x), var(--drift-y), 0) scale(0.5) rotate(var(--rot));
+  }
+}
+
+.emoji-burst-particle {
+  position: fixed;
+  pointer-events: none;
+  user-select: none;
+  font-size: 26px;
+  line-height: 1;
+  z-index: 95;
+  will-change: transform, opacity;
+  animation: emojiBurstFloat 1.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes popBounce {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-pop-in {
+  animation: popBounce 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

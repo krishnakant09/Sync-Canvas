@@ -59,6 +59,33 @@ export const MultiplayerCursors: React.FC<MultiplayerCursorsProps> = ({ remoteUs
               </text>
             </g>
 
+            {/* Real-Time Emoji Reaction Badge */}
+            {peer.reaction && ((peer.lastActive ?? peer.reaction.timestamp) - peer.reaction.timestamp < 3500) && (
+              <g transform="translate(14, -8)">
+                <rect
+                  x="-2"
+                  y="-8"
+                  rx="10"
+                  ry="10"
+                  width="26"
+                  height="22"
+                  fill="rgba(15, 23, 42, 0.95)"
+                  stroke={color}
+                  strokeWidth="1.2"
+                  filter="drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5))"
+                />
+                <text
+                  x="11"
+                  y="8"
+                  textAnchor="middle"
+                  fontSize="13"
+                  dominantBaseline="central"
+                >
+                  {peer.reaction.emoji}
+                </text>
+              </g>
+            )}
+
             {/* Real-Time Figma-Style Cursor Chat Speech Bubble */}
             {peer.cursorChat && peer.cursorChat.trim().length > 0 && (
               <g transform="translate(14, 44)">

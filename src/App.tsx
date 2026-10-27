@@ -30,6 +30,7 @@ import { CanvasRenderer } from './components/CanvasRenderer';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { CursorChat } from './components/CursorChat';
+import { ReactionOverlay } from './components/ReactionOverlay';
 
 // Initial welcoming architectural demo elements for new rooms
 const INITIAL_ELEMENTS: CanvasElement[] = [
@@ -166,6 +167,7 @@ export const App: React.FC = () => {
     updateSelectedElementIds,
     updateUserProfile,
     updateCursorChat,
+    broadcastReaction,
     setElement,
     setElementsBatch,
     deleteElementsBatch,
@@ -196,12 +198,18 @@ export const App: React.FC = () => {
   const [isPropertiesDrawerOpen, setIsPropertiesDrawerOpen] = useState(false);
   const [isCursorChatActive, setIsCursorChatActive] = useState(false);
   const isCursorChatActiveRef = useRef(isCursorChatActive);
+  const [isReactionPickerOpen, setIsReactionPickerOpen] = useState(false);
+  const isReactionPickerOpenRef = useRef(isReactionPickerOpen);
   const [editingId, setEditingId] = useState<string | null>(null);
   const editingIdRef = useRef(editingId);
 
   useEffect(() => {
     isCursorChatActiveRef.current = isCursorChatActive;
   }, [isCursorChatActive]);
+
+  useEffect(() => {
+    isReactionPickerOpenRef.current = isReactionPickerOpen;
+  }, [isReactionPickerOpen]);
 
   useEffect(() => {
     editingIdRef.current = editingId;
@@ -986,6 +994,13 @@ export const App: React.FC = () => {
         return;
       }
 
+      // Cursor Reactions / Emoji Bursts Trigger (X or :)
+      if ((e.key.toLowerCase() === 'x' || e.key === ':') && !editingIdRef.current) {
+        e.preventDefault();
+        setIsReactionPickerOpen((prev) => !prev);
+        return;
+      }
+
       if (e.code === 'Space') {
         setIsSpacePressed(true);
       }
@@ -1053,6 +1068,10 @@ export const App: React.FC = () => {
           setIsShortcutsOpen((prev) => !prev);
           break;
         case 'escape':
+          if (isReactionPickerOpenRef.current) {
+            setIsReactionPickerOpen(false);
+            return;
+          }
           if (isCursorChatActiveRef.current) {
             setIsCursorChatActive(false);
             updateCursorChat(null);
@@ -1283,6 +1302,8 @@ export const App: React.FC = () => {
         hasSelection={selectedElements.length > 0}
         isCursorChatActive={isCursorChatActive}
         onToggleCursorChat={() => setIsCursorChatActive((prev) => !prev)}
+        isReactionPickerOpen={isReactionPickerOpen}
+        onToggleReactionPicker={() => setIsReactionPickerOpen((prev) => !prev)}
         onUploadImage={() => imageFileInputRef.current?.click()}
         isMobile={isMobile}
       />
@@ -1294,6 +1315,18 @@ export const App: React.FC = () => {
         userProfile={userProfile}
         mouseScreenPos={mouseScreenPos}
         onBroadcastChat={updateCursorChat}
+        isMobile={isMobile}
+      />
+
+      {/* Figma-Style Real-Time Cursor Reactions & Emoji Bursts */}
+      <ReactionOverlay
+        isOpen={isReactionPickerOpen}
+        onClose={() => setIsReactionPickerOpen(false)}
+        localScreenPos={mouseScreenPos}
+        userProfile={userProfile}
+        onBroadcastReaction={broadcastReaction}
+        remoteUsers={remoteUsers}
+        viewport={viewport}
         isMobile={isMobile}
       />
 
