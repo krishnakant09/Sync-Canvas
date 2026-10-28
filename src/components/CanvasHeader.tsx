@@ -574,6 +574,14 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
               value={roomInput}
               onChange={(e) => setRoomInput(e.target.value)}
               onBlur={() => setIsEditingRoom(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setRoomInput(roomName);
+                  setIsEditingRoom(false);
+                }
+              }}
+              aria-label="Room name"
+              placeholder="Enter room name..."
               style={{
                 height: '28px',
                 padding: '2px 8px',
@@ -604,6 +612,7 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
             }}
             data-tooltip="Click to switch room"
             data-tooltip-pos="bottom"
+            aria-label={`Current room: ${roomName}. Click to switch room`}
           >
             <span style={{ color: 'var(--primary)' }}>#</span> {roomName}
           </button>
