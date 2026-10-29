@@ -76,12 +76,29 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
   const [roomInput, setRoomInput] = useState(roomName);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     const url = new URL(window.location.href);
     url.searchParams.set('room', roomName);
-    navigator.clipboard.writeText(url.toString());
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url.toString());
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = url.toString();
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.warn('Failed to copy room link:', err);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,8 +120,11 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
 
   const handleRoomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (roomInput.trim() && roomInput !== roomName) {
-      onChangeRoom(roomInput.trim());
+    const trimmed = roomInput.trim();
+    if (trimmed && trimmed !== roomName) {
+      onChangeRoom(trimmed);
+    } else {
+      setRoomInput(roomName);
     }
     setIsEditingRoom(false);
   };
@@ -685,6 +705,7 @@ export const CanvasHeader: React.FC<CanvasHeaderProps> = ({
           onClick={handleCopyLink}
           data-tooltip="Copy invite link to collaborate in another tab"
           data-tooltip-pos="bottom"
+          aria-label={copied ? 'Room link copied to clipboard' : 'Share room invite link'}
         >
           {copied ? <Check size={12} /> : <Share2 size={12} />}
           {copied ? 'Copied Link!' : 'Share'}
